@@ -1,4 +1,4 @@
-package first.robot.mechanism.flywheel;
+package first.robot.mechanism.feeder;
 
 import static org.wpilib.units.Units.RPM;
 
@@ -8,10 +8,10 @@ import first.lib.mechanism.TuningState;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanism;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismIO;
 
-public class Flywheel implements AngularVelocityMechanism<AngularVelocityMechanismIO> {
+public class Feeder implements AngularVelocityMechanism<AngularVelocityMechanismIO> {
   private final AngularVelocityMechanismIO m_io;
 
-  public Flywheel(AngularVelocityMechanismIO io) {
+  public Feeder(AngularVelocityMechanismIO io) {
     m_io = io;
   }
 
