@@ -26,6 +26,11 @@ public class TalonFXAngularVelocityMechanismIO implements AngularVelocityMechani
   }
 
   @Override
+  public void halt() {
+
+  }
+
+  @Override
   public void setGains(TunableGains gains) {
     // todo
   }

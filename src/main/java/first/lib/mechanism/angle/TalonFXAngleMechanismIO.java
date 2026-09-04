@@ -34,6 +34,11 @@ public class TalonFXAngleMechanismIO implements AngleMechanismIO {
   }
 
   @Override
+  public void halt() {
+
+  }
+
+  @Override
   public void setGains(TunableGains gains) {
     // todo
   }

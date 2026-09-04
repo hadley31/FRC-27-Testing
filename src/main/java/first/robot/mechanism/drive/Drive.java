@@ -12,6 +12,11 @@ public class Drive implements Mechanism {
   }
 
   public Command driveCommand(Supplier<ChassisVelocities> speeds) {
-    return run((c) -> drive(speeds.get())).named("Drive");
+    return run(coroutine -> {
+      while (true) {
+        drive(speeds.get());
+        coroutine.yield();
+      }
+    }).named("Drive");
   }
 }

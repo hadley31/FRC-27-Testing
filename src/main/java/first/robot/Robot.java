@@ -16,6 +16,7 @@ import first.robot.mechanism.feeder.Feeder;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
+import first.robot.util.SchedulerLogger;
 
 @Logged
 public class Robot extends OpModeRobot {
@@ -36,6 +37,7 @@ public class Robot extends OpModeRobot {
   @Override
   public void robotPeriodic() {
     Scheduler.getDefault().run();
+    SchedulerLogger.refresh(Scheduler.getDefault());
     Epilogue.update(this);
   }
 }

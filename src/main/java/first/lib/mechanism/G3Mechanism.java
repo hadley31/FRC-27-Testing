@@ -4,6 +4,7 @@ import java.util.function.Supplier;
 
 import org.wpilib.command3.Command;
 import org.wpilib.command3.Mechanism;
+import org.wpilib.command3.NeedsNameBuilderStage;
 import org.wpilib.command3.Trigger;
 import org.wpilib.units.Measure;
 
@@ -13,6 +14,10 @@ public interface G3Mechanism<T extends G3MechanismIO, U extends Measure<?>> exte
   public U getTarget();
 
   public void setTarget(U target);
+
+  public default void halt() {
+    getIO().halt();
+  }
 
   public boolean isNear(U measure, U tolerance);
 
@@ -52,17 +57,24 @@ public interface G3Mechanism<T extends G3MechanismIO, U extends Measure<?>> exte
     return isNearTrigger(() -> target, getDefaultTolerance());
   }
 
-  public default Command setTargetCommand(Supplier<U> targetSupplier) {
+  public default NeedsNameBuilderStage setTargetCommand(Supplier<U> targetSupplier) {
     return run(coroutine -> {
       while (true) {
         setTarget(targetSupplier.get());
         coroutine.yield();
       }
-    }).named("Set %s Target".formatted(getName()));
+    });
   }
 
-  public default Command setTargetCommand(U target) {
+  public default NeedsNameBuilderStage setTargetCommand(U target) {
     return setTargetCommand(() -> target);
+  }
+
+  public default Command haltCommand() {
+    return run(coroutine -> {
+      halt();
+      coroutine.park();
+    }).named("Halt %s".formatted(getName()));
   }
 
   public U getDefaultTolerance();
