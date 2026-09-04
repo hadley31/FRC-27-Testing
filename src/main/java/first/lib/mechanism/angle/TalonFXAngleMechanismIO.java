@@ -30,7 +30,7 @@ public class TalonFXAngleMechanismIO implements AngleMechanismIO {
 
   @Override
   public void setTargetAngle(Angle angle) {
-    m_angle = angle;
+    m_targetAngle = angle;
   }
 
   @Override
