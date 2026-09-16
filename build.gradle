@@ -61,6 +61,7 @@ dependencies {
     annotationProcessor wpi.java.deps.wpilibAnnotations()
     implementation wpi.java.deps.wpilib()
     implementation wpi.java.vendor.java()
+    implementation "com.google.code.gson:gson:2.13.1"
 
     systemcoreDebug wpi.java.deps.wpilibJniDebug(wpi.platforms.systemcore)
     systemcoreDebug wpi.java.vendor.jniDebug(wpi.platforms.systemcore)

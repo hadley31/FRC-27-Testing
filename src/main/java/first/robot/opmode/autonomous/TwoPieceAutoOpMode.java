@@ -10,4 +10,9 @@ public class TwoPieceAutoOpMode extends PeriodicOpMode {
   public TwoPieceAutoOpMode(Robot robot) {
 
   }
+
+  @Override
+  public void start() {
+
+  }
 }

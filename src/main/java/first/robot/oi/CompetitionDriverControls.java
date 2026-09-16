@@ -4,7 +4,7 @@ import org.wpilib.command3.Trigger;
 import org.wpilib.command3.button.CommandXboxController;
 
 import first.robot.util.Constants;
-import first.robot.util.DriveInputUtil;
+import first.robot.util.SwerveInputStream;
 
 public class CompetitionDriverControls implements DriverControls {
   private final CommandXboxController m_controller;
@@ -18,15 +18,15 @@ public class CompetitionDriverControls implements DriverControls {
   }
 
   public double getDriveForward() {
-    return DriveInputUtil.applyControllerStickMapping(m_controller.getLeftY(), Constants.kControllerDeadband);
+    return SwerveInputStream.applyControllerStickMapping(m_controller.getLeftY(), Constants.kControllerDeadband);
   }
 
   public double getDriveLeft() {
-    return DriveInputUtil.applyControllerStickMapping(m_controller.getLeftX(), Constants.kControllerDeadband);
+    return SwerveInputStream.applyControllerStickMapping(m_controller.getLeftX(), Constants.kControllerDeadband);
   }
 
   public double getDriveRotate() {
-    return DriveInputUtil.applyControllerStickMapping(m_controller.getRightX(), Constants.kControllerDeadband);
+    return SwerveInputStream.applyControllerStickMapping(m_controller.getRightX(), Constants.kControllerDeadband);
   }
 
   @Override

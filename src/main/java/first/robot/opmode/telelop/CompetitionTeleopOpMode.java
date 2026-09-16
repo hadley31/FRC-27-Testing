@@ -1,11 +1,8 @@
 package first.robot.opmode.telelop;
 
-import java.util.function.Supplier;
-
 import org.wpilib.command3.Command;
 import org.wpilib.command3.Scheduler;
 import org.wpilib.command3.StateMachine;
-import org.wpilib.math.kinematics.ChassisVelocities;
 import org.wpilib.opmode.PeriodicOpMode;
 import org.wpilib.opmode.Teleop;
 
@@ -13,7 +10,7 @@ import first.robot.Robot;
 import first.robot.command.RobotCommands;
 import first.robot.oi.CompetitionDriverControls;
 import first.robot.util.CommandUtil;
-import first.robot.util.DriveInputUtil;
+import first.robot.util.SwerveInputStream;
 
 @Teleop(name = "Competition Teleop")
 public class CompetitionTeleopOpMode extends PeriodicOpMode {
@@ -26,14 +23,14 @@ public class CompetitionTeleopOpMode extends PeriodicOpMode {
     m_robot = robot;
     m_robotCommands = new RobotCommands(robot);
 
-    Supplier<ChassisVelocities> chassisVelocitiesSupplier = DriveInputUtil.getChassisVelocitiesSupplier(
+    SwerveInputStream swerveInputStream = SwerveInputStream.of(
         m_driverControls::getDriveForward,
         m_driverControls::getDriveLeft,
         m_driverControls::getDriveRotate);
 
-    Command joystickDriveCommand = robot.drive.driveCommand(chassisVelocitiesSupplier);
+    Command joystickDriveCommand = robot.drive.driveCommand(swerveInputStream.getNormalDriveSupplier());
 
-    robot.drive.setDefaultCommand(joystickDriveCommand.withTimeout(null));
+    robot.drive.setDefaultCommand(joystickDriveCommand);
   }
 
   @Override
