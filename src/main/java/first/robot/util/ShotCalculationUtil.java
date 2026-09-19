@@ -32,14 +32,14 @@ public class ShotCalculationUtil {
   private Supplier<Transform2d> m_robotTransformSupplier;
 
   private final InterpolatingMeasureTreeMap<Distance, Time> m_scoringTimeOfFlightMap = InterpolatingMeasureTreeMap
-      .createDistanceToTimeMap()
+      .distanceToTime()
       .put(Feet.of(6.7), Seconds.of(0.9))
       .put(Feet.of(10.4), Seconds.of(1.4))
       .put(Feet.of(15.2), Seconds.of(1.4))
       .put(Feet.of(20), Seconds.of(1.6));
 
   private final InterpolatingMeasureTreeMap<Distance, Angle> m_scoringHoodAngleMap = InterpolatingMeasureTreeMap
-      .createDistanceToAngleMap()
+      .distanceToAngle()
       .put(Feet.of(4), Degrees.of(0))
       .put(Feet.of(5), Degrees.of(5 - 2))
       .put(Feet.of(6), Degrees.of(6.5 - 2))
@@ -55,7 +55,7 @@ public class ShotCalculationUtil {
       .put(Feet.of(16), Degrees.of(12 - 2));
 
   private final InterpolatingMeasureTreeMap<Distance, AngularVelocity> m_scoringFlywheelVelocityMap = InterpolatingMeasureTreeMap
-      .createDistanceToAngularVelocityMap()
+      .distanceToAngularVelocity()
       .put(Feet.of(4), RPM.of(1450 + 50 + 25 + 50))
       .put(Feet.of(5), RPM.of(1450 + 50 + 25 + 50))
       .put(Feet.of(6), RPM.of(1500 + 50 + 25 + 50))
