@@ -5,12 +5,6 @@ package choreo.auto;
 import static org.wpilib.units.Units.Seconds;
 import static org.wpilib.util.ErrorMessages.requireNonNullParam;
 
-import choreo.Choreo.TrajectoryCache;
-import choreo.Choreo.TrajectoryLogger;
-import choreo.trajectory.SwerveSample;
-import choreo.trajectory.Trajectory;
-import choreo.trajectory.TrajectorySample;
-import choreo.util.ChoreoAllianceFlipUtil;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +12,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
 import org.wpilib.command3.Command;
 import org.wpilib.command3.Mechanism;
 import org.wpilib.command3.Scheduler;
@@ -27,6 +22,13 @@ import org.wpilib.driverstation.MatchState;
 import org.wpilib.framework.RobotBase;
 import org.wpilib.hardware.hal.HAL;
 import org.wpilib.math.geometry.Pose2d;
+
+import choreo.Choreo.TrajectoryCache;
+import choreo.Choreo.TrajectoryLogger;
+import choreo.trajectory.SwerveSample;
+import choreo.trajectory.Trajectory;
+import choreo.trajectory.TrajectorySample;
+import choreo.util.ChoreoAllianceFlipUtil;
 
 /**
  * A factory used to create {@link AutoRoutine}s and {@link AutoTrajectory}s.
@@ -64,7 +66,8 @@ public class AutoFactory {
     private HashMap<String, Command> bindings = new HashMap<>();
 
     /** Default constructor. */
-    public AutoBindings() {}
+    public AutoBindings() {
+    }
 
     /**
      * Binds a command to an event in all trajectories created by the factory using this bindings.
@@ -137,29 +140,31 @@ public class AutoFactory {
     this.trajectoryLogger = trajectoryLogger;
     HAL.reportUsage("ChoreoTrigger", 1, "AutoFactory");
 
-    voidRoutine =
-        new AutoRoutine(this, "VOID-ROUTINE", allianceCtx) {
-          @Override
-          public Command cmd() {
-            return Command.noRequirements(coroutine -> {}).named("VoidAutoRoutine");
-          }
+    voidRoutine = new AutoRoutine(this, "VOID-ROUTINE", allianceCtx) {
+      @Override
+      public Command cmd() {
+        return Command.noRequirements(coroutine -> {
+        }).named("VoidAutoRoutine");
+      }
 
-          @Override
-          public Command cmd(BooleanSupplier _finishCondition) {
-            return cmd();
-          }
+      @Override
+      public Command cmd(BooleanSupplier _finishCondition) {
+        return cmd();
+      }
 
-          @Override
-          public void poll() {}
+      @Override
+      public void poll() {
+      }
 
-          @Override
-          public void reset() {}
+      @Override
+      public void reset() {
+      }
 
-          @Override
-          public Trigger active() {
-            return new Trigger(Scheduler.getDefault(), this.loop(), () -> true);
-          }
-        };
+      @Override
+      public Trigger active() {
+        return new Trigger(Scheduler.getDefault(), this.loop(), () -> true);
+      }
+    };
   }
 
   /**
@@ -190,7 +195,8 @@ public class AutoFactory {
         controller,
         useAllianceFlipping,
         driveSubsystem,
-        (sample, isStart) -> {});
+        (sample, isStart) -> {
+        });
   }
 
   /**
@@ -215,8 +221,7 @@ public class AutoFactory {
    * @see AutoRoutine#trajectory(String)
    */
   AutoTrajectory trajectory(String trajectoryName, AutoRoutine routine, boolean useBindings) {
-    Optional<? extends Trajectory<?>> optTrajectory =
-        trajectoryCache.loadTrajectory(trajectoryName);
+    Optional<? extends Trajectory<?>> optTrajectory = trajectoryCache.loadTrajectory(trajectoryName);
     Trajectory<?> trajectory;
     if (optTrajectory.isPresent()) {
       trajectory = optTrajectory.get();
@@ -234,8 +239,7 @@ public class AutoFactory {
    */
   AutoTrajectory trajectory(
       String trajectoryName, final int splitIndex, AutoRoutine routine, boolean useBindings) {
-    Optional<? extends Trajectory<?>> optTrajectory =
-        trajectoryCache.loadTrajectory(trajectoryName, splitIndex);
+    Optional<? extends Trajectory<?>> optTrajectory = trajectoryCache.loadTrajectory(trajectoryName, splitIndex);
     Trajectory<?> trajectory;
     if (optTrajectory.isPresent()) {
       trajectory = optTrajectory.get();
@@ -466,10 +470,10 @@ public class AutoFactory {
   public Command resetOdometry(Optional<Pose2d> pose, boolean doFlipForAlliance) {
     if (pose.isEmpty()) {
       // equivalent to a no-op requiring driveSubsystem.
-      return driveSubsystem.run(coroutine -> {}).named("ResetOdometry");
+      return driveSubsystem.run(coroutine -> {
+      }).named("ResetOdometry");
     }
-    Supplier<Optional<Pose2d>> supplier =
-        doFlipForAlliance ? allianceCtx.getFlippedPose(pose) : (() -> pose);
+    Supplier<Optional<Pose2d>> supplier = doFlipForAlliance ? allianceCtx.getFlippedPose(pose) : (() -> pose);
     return resetOdometry(supplier);
   }
 

@@ -4,10 +4,10 @@ package choreo.auto;
 
 import static org.wpilib.util.Alert.Level.HIGH;
 
-import choreo.util.ChoreoAlert;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.function.Supplier;
+
 import org.wpilib.command3.Command;
 import org.wpilib.driverstation.Alliance;
 import org.wpilib.driverstation.MatchState;
@@ -18,6 +18,8 @@ import org.wpilib.tunable.TunableConfig;
 import org.wpilib.tunable.TunableOption;
 import org.wpilib.tunable.TunableTable;
 import org.wpilib.util.Alert;
+
+import choreo.util.ChoreoAlert;
 
 /**
  * An Choreo specific {@code Selectable} that allows for the selection of {@link AutoRoutine}s at
@@ -39,8 +41,7 @@ import org.wpilib.util.Alert;
  */
 public class AutoChooser implements ComplexTunable {
   private final String DO_NOTHING_NAME;
-  private static final Alert selectedNonexistentAuto =
-      ChoreoAlert.alert("Selected an auto that isn't an option", HIGH);
+  private static final Alert selectedNonexistentAuto = ChoreoAlert.alert("Selected an auto that isn't an option", HIGH);
 
   private final HashMap<String, Supplier<Command>> autoRoutines = new HashMap<>();
 
@@ -71,7 +72,8 @@ public class AutoChooser implements ComplexTunable {
 
   /** Creates a command that does nothing and immediately completes. */
   private static Command none(String name) {
-    return Command.noRequirements(coroutine -> {}).named(name);
+    return Command.noRequirements(coroutine -> {
+    }).named(name);
   }
 
   /** Creates a proxy command that runs {@code inner} under the given display name. */

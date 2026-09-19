@@ -4,6 +4,22 @@ package choreo.auto;
 
 import static choreo.util.ChoreoAlert.allianceNotReady;
 
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import org.wpilib.command3.Command;
+import org.wpilib.command3.Mechanism;
+import org.wpilib.command3.Scheduler;
+import org.wpilib.command3.Trigger;
+import org.wpilib.math.geometry.Pose2d;
+import org.wpilib.math.geometry.Rotation2d;
+import org.wpilib.math.geometry.Translation2d;
+import org.wpilib.system.Timer;
+import org.wpilib.util.Alert.Level;
+
 import choreo.Choreo.TrajectoryLogger;
 import choreo.auto.AutoFactory.AllianceContext;
 import choreo.auto.AutoFactory.AutoBindings;
@@ -14,20 +30,6 @@ import choreo.trajectory.TrajectorySample;
 import choreo.util.ChoreoAlert;
 import choreo.util.ChoreoAlert.MultiAlert;
 import choreo.util.ChoreoAllianceFlipUtil;
-import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-import org.wpilib.command3.Command;
-import org.wpilib.command3.Mechanism;
-import org.wpilib.command3.Scheduler;
-import org.wpilib.command3.Trigger;
-import org.wpilib.math.geometry.Pose2d;
-import org.wpilib.math.geometry.Rotation2d;
-import org.wpilib.math.geometry.Translation2d;
-import org.wpilib.system.Timer;
-import org.wpilib.util.Alert.Level;
 
 /**
  * A class that represents a trajectory that can be used in an autonomous routine and have triggers
@@ -41,19 +43,17 @@ public class AutoTrajectory {
   // code. This also makes the places with generics exposed to users few
   // and far between. This helps with more novice users
 
-  private static final MultiAlert triggerTimeNegative =
-      ChoreoAlert.multiAlert(causes -> "Trigger time cannot be negative for " + causes, Level.HIGH);
-  private static final MultiAlert triggerTimeAboveMax =
-      ChoreoAlert.multiAlert(
-          causes -> "Trigger time cannot be greater than total trajectory time for " + causes + ".",
-          Level.HIGH);
-  private static final MultiAlert eventNotFound =
-      ChoreoAlert.multiAlert(causes -> "Event Markers " + causes + " not found.", Level.HIGH);
-  private static final MultiAlert noSamples =
-      ChoreoAlert.multiAlert(causes -> "Trajectories " + causes + " have no samples.", Level.HIGH);
-  private static final MultiAlert noInitialPose =
-      ChoreoAlert.multiAlert(
-          causes -> "Unable to get initial pose for trajectories " + causes + ".", Level.HIGH);
+  private static final MultiAlert triggerTimeNegative = ChoreoAlert
+      .multiAlert(causes -> "Trigger time cannot be negative for " + causes, Level.HIGH);
+  private static final MultiAlert triggerTimeAboveMax = ChoreoAlert.multiAlert(
+      causes -> "Trigger time cannot be greater than total trajectory time for " + causes + ".",
+      Level.HIGH);
+  private static final MultiAlert eventNotFound = ChoreoAlert
+      .multiAlert(causes -> "Event Markers " + causes + " not found.", Level.HIGH);
+  private static final MultiAlert noSamples = ChoreoAlert
+      .multiAlert(causes -> "Trajectories " + causes + " have no samples.", Level.HIGH);
+  private static final MultiAlert noInitialPose = ChoreoAlert.multiAlert(
+      causes -> "Unable to get initial pose for trajectories " + causes + ".", Level.HIGH);
 
   final String name;
   final Trajectory<? extends TrajectorySample<?>> trajectory;
@@ -124,15 +124,12 @@ public class AutoTrajectory {
     }
     var sample = sampleOpt.get();
     if (sample instanceof SwerveSample) {
-      TrajectoryLogger<SwerveSample> swerveLogger =
-          (TrajectoryLogger<SwerveSample>) trajectoryLogger;
+      TrajectoryLogger<SwerveSample> swerveLogger = (TrajectoryLogger<SwerveSample>) trajectoryLogger;
       Trajectory<SwerveSample> swerveTrajectory = (Trajectory<SwerveSample>) trajectory;
       swerveLogger.accept(swerveTrajectory, starting);
     } else if (sample instanceof DifferentialSample) {
-      TrajectoryLogger<DifferentialSample> differentialLogger =
-          (TrajectoryLogger<DifferentialSample>) trajectoryLogger;
-      Trajectory<DifferentialSample> differentialTrajectory =
-          (Trajectory<DifferentialSample>) trajectory;
+      TrajectoryLogger<DifferentialSample> differentialLogger = (TrajectoryLogger<DifferentialSample>) trajectoryLogger;
+      Trajectory<DifferentialSample> differentialTrajectory = (Trajectory<DifferentialSample>) trajectory;
       differentialLogger.accept(differentialTrajectory, starting);
     }
     ;
@@ -253,15 +250,14 @@ public class AutoTrajectory {
   public Command resetOdometry() {
     return driveSubsystem
         .run(
-            coroutine ->
-                getInitialPose()
-                    .ifPresentOrElse(
-                        resetOdometry,
-                        () -> {
-                          if (warnUser) {
-                            noInitialPose.addCause(name);
-                          }
-                        }))
+            coroutine -> getInitialPose()
+                .ifPresentOrElse(
+                    resetOdometry,
+                    () -> {
+                      if (warnUser) {
+                        noInitialPose.addCause(name);
+                      }
+                    }))
         .named("Trajectory_ResetOdometry_" + name);
   }
 
@@ -275,8 +271,7 @@ public class AutoTrajectory {
    * @return The underlying {@link Trajectory} object.
    */
   @SuppressWarnings("unchecked")
-  public <SampleType extends TrajectorySample<SampleType>>
-      Trajectory<SampleType> getRawTrajectory() {
+  public <SampleType extends TrajectorySample<SampleType>> Trajectory<SampleType> getRawTrajectory() {
     return (Trajectory<SampleType>) trajectory;
   }
 
@@ -611,31 +606,26 @@ public class AutoTrajectory {
   public Trigger atPose(Pose2d pose, double toleranceMeters, double toleranceRadians) {
     Pose2d flippedPose = ChoreoAllianceFlipUtil.flip(pose);
     return new Trigger(
-            () -> {
-              if (allianceCtx.allianceKnownOrIgnored()) {
-                final Pose2d currentPose = poseSupplier.get();
-                if (allianceCtx.doFlip()) {
-                  boolean transValid =
-                      currentPose.getTranslation().getDistance(flippedPose.getTranslation())
-                          < toleranceMeters;
-                  boolean rotValid =
-                      withinTolerance(
-                          currentPose.getRotation(), flippedPose.getRotation(), toleranceRadians);
-                  return transValid && rotValid;
-                } else {
-                  boolean transValid =
-                      currentPose.getTranslation().getDistance(pose.getTranslation())
-                          < toleranceMeters;
-                  boolean rotValid =
-                      withinTolerance(
-                          currentPose.getRotation(), pose.getRotation(), toleranceRadians);
-                  return transValid && rotValid;
-                }
-              } else {
-                allianceNotReady.set(true);
-                return false;
-              }
-            })
+        () -> {
+          if (allianceCtx.allianceKnownOrIgnored()) {
+            final Pose2d currentPose = poseSupplier.get();
+            if (allianceCtx.doFlip()) {
+              boolean transValid = currentPose.getTranslation()
+                  .getDistance(flippedPose.getTranslation()) < toleranceMeters;
+              boolean rotValid = withinTolerance(
+                  currentPose.getRotation(), flippedPose.getRotation(), toleranceRadians);
+              return transValid && rotValid;
+            } else {
+              boolean transValid = currentPose.getTranslation().getDistance(pose.getTranslation()) < toleranceMeters;
+              boolean rotValid = withinTolerance(
+                  currentPose.getRotation(), pose.getRotation(), toleranceRadians);
+              return transValid && rotValid;
+            }
+          } else {
+            allianceNotReady.set(true);
+            return false;
+          }
+        })
         .and(active());
   }
 
@@ -663,12 +653,11 @@ public class AutoTrajectory {
       // with having it all be 1 trigger that just has a list of possess and checks each one each
       // cycle or something like that.
       // If choreo starts showing memory issues we can look into this.
-      Optional<Pose2d> poseOpt =
-          trajectory
-              // don't mirror here because the poses are mirrored themselves
-              // this also lets atPose be called before the alliance is ready
-              .sampleAt(event.timestamp, false)
-              .map(TrajectorySample::getPose);
+      Optional<Pose2d> poseOpt = trajectory
+          // don't mirror here because the poses are mirrored themselves
+          // this also lets atPose be called before the alliance is ready
+          .sampleAt(event.timestamp, false)
+          .map(TrajectorySample::getPose);
       if (poseOpt.isPresent()) {
         trig = trig.or(atPose(poseOpt.get(), toleranceMeters, toleranceRadians));
         foundEvent = true;
@@ -702,19 +691,19 @@ public class AutoTrajectory {
   public Trigger atTranslation(Translation2d translation, double toleranceMeters) {
     Translation2d flippedTranslation = ChoreoAllianceFlipUtil.flip(translation);
     return new Trigger(
-            () -> {
-              if (allianceCtx.allianceKnownOrIgnored()) {
-                final Translation2d currentTrans = poseSupplier.get().getTranslation();
-                if (allianceCtx.doFlip()) {
-                  return currentTrans.getDistance(flippedTranslation) < toleranceMeters;
-                } else {
-                  return currentTrans.getDistance(translation) < toleranceMeters;
-                }
-              } else {
-                allianceNotReady.set(true);
-                return false;
-              }
-            })
+        () -> {
+          if (allianceCtx.allianceKnownOrIgnored()) {
+            final Translation2d currentTrans = poseSupplier.get().getTranslation();
+            if (allianceCtx.doFlip()) {
+              return currentTrans.getDistance(flippedTranslation) < toleranceMeters;
+            } else {
+              return currentTrans.getDistance(translation) < toleranceMeters;
+            }
+          } else {
+            allianceNotReady.set(true);
+            return false;
+          }
+        })
         .and(active());
   }
 
@@ -741,13 +730,12 @@ public class AutoTrajectory {
       // with having it all be 1 trigger that just has a list of poses and checks each one each
       // cycle or something like that.
       // If choreo starts showing memory issues we can look into this.
-      Optional<Translation2d> translationOpt =
-          trajectory
-              // don't mirror here because the translations are mirrored themselves
-              // this also lets atTranslation be called before the alliance is ready
-              .sampleAt(event.timestamp, false)
-              .map(TrajectorySample::getPose)
-              .map(Pose2d::getTranslation);
+      Optional<Translation2d> translationOpt = trajectory
+          // don't mirror here because the translations are mirrored themselves
+          // this also lets atTranslation be called before the alliance is ready
+          .sampleAt(event.timestamp, false)
+          .map(TrajectorySample::getPose)
+          .map(Pose2d::getTranslation);
       if (translationOpt.isPresent()) {
         trig = trig.or(atTranslation(translationOpt.get(), toleranceMeters));
         foundEvent = true;
@@ -772,11 +760,10 @@ public class AutoTrajectory {
    *     GUI</a>
    */
   public double[] collectEventTimes(String eventName) {
-    double[] times =
-        trajectory.getEvents(eventName).stream()
-            .filter(e -> e.timestamp >= 0 && e.timestamp <= trajectory.getTotalTime())
-            .mapToDouble(e -> e.timestamp)
-            .toArray();
+    double[] times = trajectory.getEvents(eventName).stream()
+        .filter(e -> e.timestamp >= 0 && e.timestamp <= trajectory.getTotalTime())
+        .mapToDouble(e -> e.timestamp)
+        .toArray();
 
     if (times.length == 0 && warnUser) {
       eventNotFound.addCause("collectEvents(" + eventName + ")");
@@ -801,11 +788,10 @@ public class AutoTrajectory {
     double[] times = collectEventTimes(eventName);
     Pose2d[] poses = new Pose2d[times.length];
     for (int i = 0; i < times.length; i++) {
-      Pose2d pose =
-          trajectory
-              .sampleAt(times[i], false)
-              .map(TrajectorySample::getPose)
-              .get(); // the event times are guaranteed to be valid
+      Pose2d pose = trajectory
+          .sampleAt(times[i], false)
+          .map(TrajectorySample::getPose)
+          .get(); // the event times are guaranteed to be valid
       poses[i] = pose;
     }
     return poses;
