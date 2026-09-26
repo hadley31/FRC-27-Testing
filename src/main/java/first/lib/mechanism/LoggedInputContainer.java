@@ -17,9 +17,9 @@ import org.littletonrobotics.junction.inputs.LoggableInputs;
  * @param <IO> the IO interface this container talks to
  * @param <I>  the inputs class {@code IO} populates
  */
-public interface LoggedInputContainer<IO extends LoggedIO<I>, I extends LoggableInputs> {
+public interface LoggedInputContainer<T extends LoggedIO<I>, I extends LoggableInputs> {
   /** Returns the IO layer. Use it to command the hardware; use {@link #getInputs()} to read it. */
-  public IO getIO();
+  public T getIO();
 
   /**
    * Returns the inputs most recently filled by {@link #update()}. This is the single source of

@@ -7,8 +7,8 @@ import org.wpilib.units.measure.LinearVelocity;
 
 import first.lib.mechanism.G3Mechanism;
 
-public interface PositionMechanism<IO extends PositionMechanismIO>
-    extends G3Mechanism<IO, PositionMechanismInputsAutoLogged, Distance> {
+public interface PositionMechanism<T extends PositionMechanismIO>
+    extends G3Mechanism<T, PositionMechanismInputsAutoLogged, Distance> {
   @Override
   public default Distance getCurrentMeasurement() {
     return getInputs().currentPosition;

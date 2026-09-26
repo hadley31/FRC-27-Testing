@@ -7,8 +7,8 @@ import org.wpilib.units.measure.AngularVelocity;
 
 import first.lib.mechanism.G3Mechanism;
 
-public interface AngularVelocityMechanism<IO extends AngularVelocityMechanismIO>
-    extends G3Mechanism<IO, AngularVelocityMechanismInputsAutoLogged, AngularVelocity> {
+public interface AngularVelocityMechanism<T extends AngularVelocityMechanismIO>
+    extends G3Mechanism<T, AngularVelocityMechanismInputsAutoLogged, AngularVelocity> {
   @Override
   public default AngularVelocity getCurrentMeasurement() {
     return getInputs().currentAngularVelocity;

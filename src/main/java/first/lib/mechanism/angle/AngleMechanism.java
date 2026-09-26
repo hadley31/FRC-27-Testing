@@ -7,8 +7,8 @@ import org.wpilib.units.measure.AngularVelocity;
 
 import first.lib.mechanism.G3Mechanism;
 
-public interface AngleMechanism<IO extends AngleMechanismIO>
-    extends G3Mechanism<IO, AngleMechanismInputsAutoLogged, Angle> {
+public interface AngleMechanism<T extends AngleMechanismIO>
+    extends G3Mechanism<T, AngleMechanismInputsAutoLogged, Angle> {
   @Override
   public default Angle getCurrentMeasurement() {
     return getInputs().currentAngle;
