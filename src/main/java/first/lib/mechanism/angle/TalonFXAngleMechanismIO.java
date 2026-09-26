@@ -3,6 +3,7 @@ package first.lib.mechanism.angle;
 import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 
+import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.Slot0Configs;
@@ -27,18 +28,11 @@ public class TalonFXAngleMechanismIO implements AngleMechanismIO {
   }
 
   @Override
-  public Angle getCurrentAngle() {
-    return m_position.getValue();
-  }
-
-  @Override
-  public Angle getTargetAngle() {
-    return m_control.getPositionMeasure();
-  }
-
-  @Override
-  public AngularVelocity getCurrentAngularVelocity() {
-    return m_angularVelocity.getValue();
+  public void updateInputs(AngleMechanismInputsAutoLogged inputs) {
+    BaseStatusSignal.refreshAll(m_position, m_angularVelocity);
+    inputs.currentAngle = m_position.getValue();
+    inputs.currentAngularVelocity = m_angularVelocity.getValue();
+    inputs.targetAngle = m_control.getPositionMeasure();
   }
 
   @Override

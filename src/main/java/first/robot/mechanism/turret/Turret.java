@@ -6,10 +6,12 @@ import org.wpilib.units.measure.Angle;
 
 import first.lib.mechanism.TuningState;
 import first.lib.mechanism.angle.AngleMechanism;
+import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 import first.lib.mechanism.angle.AngleMechanismIO;
 
 public class Turret implements AngleMechanism<AngleMechanismIO> {
   private final AngleMechanismIO m_io;
+  private final AngleMechanismInputsAutoLogged m_inputs = new AngleMechanismInputsAutoLogged();
 
   public Turret(AngleMechanismIO io) {
     m_io = io;
@@ -18,6 +20,11 @@ public class Turret implements AngleMechanism<AngleMechanismIO> {
   @Override
   public AngleMechanismIO getIO() {
     return m_io;
+  }
+
+  @Override
+  public AngleMechanismInputsAutoLogged getInputs() {
+    return m_inputs;
   }
 
   @Override

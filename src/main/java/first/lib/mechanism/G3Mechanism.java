@@ -2,13 +2,20 @@ package first.lib.mechanism;
 
 import java.util.function.Supplier;
 
+import org.littletonrobotics.junction.inputs.LoggableInputs;
 import org.wpilib.command3.Command;
 import org.wpilib.command3.Mechanism;
 import org.wpilib.command3.NeedsNameBuilderStage;
 import org.wpilib.command3.Trigger;
 import org.wpilib.units.Measure;
 
-public interface G3Mechanism<T extends G3MechanismIO, U extends Measure<?>> extends Mechanism, IOContainer<T> {
+public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInputs, U extends Measure<?>>
+    extends Mechanism, LoggedInputContainer<T, I> {
+  @Override
+  public default String getLogName() {
+    return getName();
+  }
+
   public U getCurrentMeasurement();
 
   public U getTarget();

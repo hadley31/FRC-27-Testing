@@ -3,18 +3,24 @@ package first.lib.mechanism.position;
 import static org.wpilib.units.Units.Inches;
 
 import org.wpilib.units.measure.Distance;
+import org.wpilib.units.measure.LinearVelocity;
 
 import first.lib.mechanism.G3Mechanism;
 
-public interface PositionMechanism<T extends PositionMechanismIO> extends G3Mechanism<T, Distance> {
+public interface PositionMechanism<IO extends PositionMechanismIO>
+    extends G3Mechanism<IO, PositionMechanismInputsAutoLogged, Distance> {
   @Override
   public default Distance getCurrentMeasurement() {
-    return getIO().getPosition();
+    return getInputs().currentPosition;
   }
 
   @Override
   public default Distance getTarget() {
-    return getIO().getTargetPosition();
+    return getInputs().targetPosition;
+  }
+
+  public default LinearVelocity getCurrentVelocity() {
+    return getInputs().currentVelocity;
   }
 
   @Override

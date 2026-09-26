@@ -2,20 +2,25 @@ package first.lib.mechanism.angularvelocity;
 
 import static org.wpilib.units.Units.RPM;
 
+import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 
 import first.lib.mechanism.G3Mechanism;
 
-public interface AngularVelocityMechanism<T extends AngularVelocityMechanismIO>
-    extends G3Mechanism<T, AngularVelocity> {
+public interface AngularVelocityMechanism<IO extends AngularVelocityMechanismIO>
+    extends G3Mechanism<IO, AngularVelocityMechanismInputsAutoLogged, AngularVelocity> {
   @Override
   public default AngularVelocity getCurrentMeasurement() {
-    return getIO().getCurrentAngularVelocity();
+    return getInputs().currentAngularVelocity;
   }
 
   @Override
   public default AngularVelocity getTarget() {
-    return getIO().getTargetAngularVelocity();
+    return getInputs().targetAngularVelocity;
+  }
+
+  public default Angle getCurrentAngle() {
+    return getInputs().currentAngle;
   }
 
   @Override

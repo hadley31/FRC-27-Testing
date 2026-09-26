@@ -3,18 +3,24 @@ package first.lib.mechanism.angle;
 import static org.wpilib.units.Units.Degrees;
 
 import org.wpilib.units.measure.Angle;
+import org.wpilib.units.measure.AngularVelocity;
 
 import first.lib.mechanism.G3Mechanism;
 
-public interface AngleMechanism<T extends AngleMechanismIO> extends G3Mechanism<T, Angle> {
+public interface AngleMechanism<IO extends AngleMechanismIO>
+    extends G3Mechanism<IO, AngleMechanismInputsAutoLogged, Angle> {
   @Override
   public default Angle getCurrentMeasurement() {
-    return getIO().getCurrentAngle();
+    return getInputs().currentAngle;
   }
 
   @Override
   public default Angle getTarget() {
-    return getIO().getTargetAngle();
+    return getInputs().targetAngle;
+  }
+
+  public default AngularVelocity getCurrentAngularVelocity() {
+    return getInputs().currentAngularVelocity;
   }
 
   @Override
