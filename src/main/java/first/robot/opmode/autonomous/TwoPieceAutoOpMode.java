@@ -2,8 +2,10 @@ package first.robot.opmode.autonomous;
 
 import static org.wpilib.units.Units.Seconds;
 
+import org.littletonrobotics.junction.Logger;
 import org.wpilib.command3.Command;
 import org.wpilib.command3.Scheduler;
+import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.opmode.Autonomous;
 import org.wpilib.opmode.PeriodicOpMode;
 
@@ -12,7 +14,6 @@ import choreo.auto.AutoRoutine;
 import choreo.auto.AutoTrajectory;
 import first.robot.Robot;
 import first.robot.command.RobotCommands;
-import first.robot.util.CommandUtil;
 
 @Autonomous(name = "Two Piece Auto")
 public class TwoPieceAutoOpMode extends PeriodicOpMode {
@@ -30,14 +31,19 @@ public class TwoPieceAutoOpMode extends PeriodicOpMode {
         m_robot.drive::resetPose,
         m_robot.drive::followSample,
         false,
-        m_robot.drive);
+        m_robot.drive,
+        (trajectory, isStart) -> {
+          if (isStart) {
+            Logger.recordOutput("AutoTrajectory", Pose2d.struct, trajectory.getPoses());
+          } else {
+            Logger.recordOutput("AutoTrajectory", Pose2d.struct, new Pose2d[0]);
+          }
+        });
   }
 
   private AutoRoutine twoPieceRoutine() {
     AutoRoutine routine = m_factory.newRoutine("Two Piece Auto");
     AutoTrajectory grabSecondPiece = routine.trajectory("TwoPieceAuto");
-
-    grabSecondPiece.atTime("retract_intake").onTrue(CommandUtil.print("Hello"));
 
     routine.active().onTrue(
         Command.noRequirements(coroutine -> {

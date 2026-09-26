@@ -1,24 +1,30 @@
 package first.robot.util;
 
+import java.util.List;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
+
 import org.wpilib.command3.Command;
+import org.wpilib.command3.Scheduler;
 
 public class CommandUtil {
   public static Command print(String message) {
     return Command.noRequirements(coroutine -> System.out.println(message)).named("PrintCommand");
   }
 
-  // // v2Command's requirements (Subsystems) must be re-declared as v3 Mechanisms yourself.
-  // public static Command fromV2( v2Command, Mechanism... requirements) {
-  //   return Command.requiring(List.of(requirements))
-  //       .executing(coroutine -> {
-  //         v2Command.initialize();
-  //         while (!v2Command.isFinished()) {
-  //           v2Command.execute();
-  //           coroutine.yield();
-  //         }
-  //         v2Command.end(false);
-  //       })
-  //       .whenCanceled(() -> v2Command.end(true))
-  //       .named(v2Command.getName());
-  // }
+  private static <T> Predicate<T> isNotNullPredicate(UnaryOperator<T> consumer) {
+    return t -> {
+      if (t == null) {
+        return false;
+      }
+      return consumer.apply(t) != null;
+    };
+  }
+
+  public static List<Command> lineage(Scheduler scheduler, Command command) {
+    UnaryOperator<Command> getParent = scheduler::getParentOf;
+    return Stream.iterate(command, isNotNullPredicate(getParent), getParent).toList()
+        .reversed();
+  }
 }

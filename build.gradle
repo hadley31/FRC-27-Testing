@@ -84,8 +84,17 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// Launches AdvantageKit's replay watcher, which re-runs replay whenever the code is rebuilt.
+task(replayWatch, type: JavaExec) {
+    mainClass = "org.littletonrobotics.junction.ReplayWatch"
+    classpath = sourceSets.main.runtimeClasspath
+}
+
 test {
     useJUnitPlatform()
+    // AdvantageKit's Logger is a static singleton whose receiver thread cannot be restarted once
+    // ended, so each test class needs its own JVM.
+    forkEvery = 1
     systemProperty 'junit.jupiter.extensions.autodetection.enabled', 'true'
 }
 
