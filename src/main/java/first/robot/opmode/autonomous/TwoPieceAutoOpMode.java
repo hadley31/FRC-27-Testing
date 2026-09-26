@@ -12,6 +12,7 @@ import choreo.auto.AutoRoutine;
 import choreo.auto.AutoTrajectory;
 import first.robot.Robot;
 import first.robot.command.RobotCommands;
+import first.robot.util.CommandUtil;
 
 @Autonomous(name = "Two Piece Auto")
 public class TwoPieceAutoOpMode extends PeriodicOpMode {
@@ -35,6 +36,8 @@ public class TwoPieceAutoOpMode extends PeriodicOpMode {
   private AutoRoutine twoPieceRoutine() {
     AutoRoutine routine = m_factory.newRoutine("Two Piece Auto");
     AutoTrajectory grabSecondPiece = routine.trajectory("TwoPieceAuto");
+
+    grabSecondPiece.atTime("retract_intake").onTrue(CommandUtil.print("Hello"));
 
     routine.active().onTrue(
         Command.noRequirements(coroutine -> {

@@ -7,20 +7,24 @@ import org.wpilib.tunable.Tunables;
 public class TunableGains {
   private final TunableDouble m_kS;
   private final TunableDouble m_kV;
+  private final TunableDouble m_kA;
+  private final TunableDouble m_kG;
   private final TunableDouble m_kP;
   private final TunableDouble m_kI;
   private final TunableDouble m_kD;
 
-  public TunableGains(String namePrefix, double kS, double kV, double kP, double kI, double kD) {
+  public TunableGains(String namePrefix, double kS, double kV, double kA, double kG, double kP, double kI, double kD) {
     m_kS = Tunables.addDouble(namePrefix + " kS", kS);
     m_kV = Tunables.addDouble(namePrefix + " kV", kV);
+    m_kA = Tunables.addDouble(namePrefix + " kA", kA);
+    m_kG = Tunables.addDouble(namePrefix + " kG", kG);
     m_kP = Tunables.addDouble(namePrefix + " kP", kP);
     m_kI = Tunables.addDouble(namePrefix + " kI", kI);
     m_kD = Tunables.addDouble(namePrefix + " kD", kD);
   }
 
   public TunableGains(String namePrefix) {
-    this(namePrefix, 0.0, 0.0, 0.0, 0.0, 0.0);
+    this(namePrefix, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
   }
 
   public double kS() {
@@ -29,6 +33,14 @@ public class TunableGains {
 
   public double kV() {
     return m_kV.get();
+  }
+
+  public double kA() {
+    return m_kA.get();
+  }
+
+  public double kG() {
+    return m_kG.get();
   }
 
   public double kP() {
@@ -44,6 +56,7 @@ public class TunableGains {
   }
 
   public boolean hasChanged() {
-    return m_kS.hasChanged() || m_kV.hasChanged() || m_kP.hasChanged() || m_kI.hasChanged() || m_kD.hasChanged();
+    return m_kS.hasChanged() || m_kV.hasChanged() || m_kA.hasChanged() || m_kG.hasChanged() || m_kP.hasChanged()
+        || m_kI.hasChanged() || m_kD.hasChanged();
   }
 }

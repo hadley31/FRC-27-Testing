@@ -1,10 +1,13 @@
 package first.lib.mechanism.angularvelocity;
 
+import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 
 import first.lib.mechanism.G3MechanismIO;
 
 public interface AngularVelocityMechanismIO extends G3MechanismIO {
+  public Angle getCurrentAngle();
+
   public AngularVelocity getCurrentAngularVelocity();
 
   public AngularVelocity getTargetAngularVelocity();

@@ -9,6 +9,8 @@ import org.wpilib.epilogue.Epilogue;
 import org.wpilib.epilogue.Logged;
 import org.wpilib.framework.OpModeRobot;
 
+import com.ctre.phoenix6.CANBus;
+
 import first.lib.mechanism.angle.TalonFXAngleMechanismIO;
 import first.lib.mechanism.angularvelocity.TalonFXAngularVelocityMechanismIO;
 import first.robot.mechanism.drive.Drive;
@@ -20,6 +22,8 @@ import first.robot.util.SchedulerLogger;
 
 @Logged
 public class Robot extends OpModeRobot {
+  private static final CANBus CAN_BUS = new CANBus("CANivore");
+
   public final Drive drive;
   public final Flywheel flywheel;
   public final Turret turret;
@@ -28,10 +32,10 @@ public class Robot extends OpModeRobot {
 
   public Robot() {
     drive = new Drive();
-    flywheel = new Flywheel(new TalonFXAngularVelocityMechanismIO());
-    turret = new Turret(new TalonFXAngleMechanismIO());
-    hood = new Hood(new TalonFXAngleMechanismIO());
-    feeder = new Feeder(new TalonFXAngularVelocityMechanismIO());
+    flywheel = new Flywheel(new TalonFXAngularVelocityMechanismIO(0, CAN_BUS));
+    turret = new Turret(new TalonFXAngleMechanismIO(1, CAN_BUS));
+    hood = new Hood(new TalonFXAngleMechanismIO(2, CAN_BUS));
+    feeder = new Feeder(new TalonFXAngularVelocityMechanismIO(3, CAN_BUS));
   }
 
   @Override

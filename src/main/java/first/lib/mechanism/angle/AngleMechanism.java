@@ -9,7 +9,7 @@ import first.lib.mechanism.G3Mechanism;
 public interface AngleMechanism<T extends AngleMechanismIO> extends G3Mechanism<T, Angle> {
   @Override
   public default Angle getCurrentMeasurement() {
-    return getIO().getAngle();
+    return getIO().getCurrentAngle();
   }
 
   @Override
