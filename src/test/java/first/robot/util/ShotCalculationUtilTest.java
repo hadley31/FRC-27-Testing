@@ -21,10 +21,10 @@ import first.lib.InterpolatingMeasureTreeMap;
  * are easy to state by hand: a stationary shot aims at 0 degrees, and a shot taken while strafing in
  * +Y must lead against that motion, i.e. turn negative.
  *
- * <p>Ranges are kept inside the interior of {@link ShotProfile#kScoring}'s tables. Their spans are
- * roughly 4-25 ft (flywheel), 4-16 ft (hood) and 6.7-20 ft (time of flight), so the usable overlap is
- * about 2.05 m to 4.85 m. Outside it the interpolator clamps to an endpoint and every comparison
- * below would collapse to an equality.
+ * <p>Ranges are kept inside the interior of {@link ShotProfile#kScoring}'s table, which spans 4-25 ft
+ * (about 1.2 m to 7.6 m) on all three curves. Outside it the interpolator clamps to an endpoint and
+ * every comparison below would collapse to an equality. The curves are also flat in places — the hood
+ * does not move past 12 ft — so the fixtures stay in the 2 m to 5 m band where all three still change.
  */
 class ShotCalculationUtilTest {
   private static final double kEpsilonDegrees = 1e-6;
@@ -35,9 +35,15 @@ class ShotCalculationUtilTest {
   /** 4 m downrange at turret height: ~13.1 ft, comfortably inside every table. */
   private static final Translation3d kTarget = new Translation3d(4.0, 0.0, 1.0);
 
+  /** The calculator as the robot runs it, with velocity compensation on. */
+  private static final ShotCalculationUtil kCompensating = new ShotCalculationUtil(() -> true);
+
+  /** The same calculator with the dashboard toggle off. */
+  private static final ShotCalculationUtil kUncompensated = new ShotCalculationUtil(() -> false);
+
   private static ShotParameters shotWith(
       Translation3d turretPosition, Rotation2d robotRotation, ChassisVelocities velocity) {
-    return ShotCalculationUtil.calculateShot(
+    return kCompensating.calculateShot(
         new TurretSnapshot(turretPosition, robotRotation, velocity), kTarget, ShotProfile.kScoring);
   }
 
@@ -79,7 +85,7 @@ class ShotCalculationUtilTest {
   void rangeIsTheSlantRangeNotTheGroundRange() {
     // Turret 2 m above a target on the floor: the slant range must exceed the 4 m ground range, so
     // the flywheel must run faster than for a level shot over the same ground.
-    var elevated = ShotCalculationUtil.calculateShot(
+    var elevated = kCompensating.calculateShot(
         new TurretSnapshot(new Translation3d(0.0, 0.0, 2.0), Rotation2d.ZERO, new ChassisVelocities()),
         new Translation3d(4.0, 0.0, 0.0),
         ShotProfile.kScoring);
@@ -191,15 +197,56 @@ class ShotCalculationUtilTest {
     var snapshot = new TurretSnapshot(
         kTurretPosition, Rotation2d.ZERO, new ChassisVelocities(0.0, 2.0, 0.0));
 
-    double slowLead = ShotCalculationUtil.calculateShot(snapshot, kTarget, slowProfile)
+    double slowLead = kCompensating.calculateShot(snapshot, kTarget, slowProfile)
         .targetTurretAngle().in(Degrees);
-    double fastLead = ShotCalculationUtil.calculateShot(snapshot, kTarget, fastProfile)
+    double fastLead = kCompensating.calculateShot(snapshot, kTarget, fastProfile)
         .targetTurretAngle().in(Degrees);
 
     // atan2 is not linear, so assert ordering and the exact geometry rather than a ratio.
     assertTrue(slowLead < fastLead, "a slower shot should lead further");
     assertEquals(Math.toDegrees(Math.atan2(-2.0 * 2.8, 4.0)), slowLead, 1e-9);
     assertEquals(Math.toDegrees(Math.atan2(-2.0 * 1.4, 4.0)), fastLead, 1e-9);
+  }
+
+  @Test
+  void disablingVelocityCompensationAimsStraightAtTheTarget() {
+    var snapshot = new TurretSnapshot(
+        kTurretPosition, Rotation2d.ZERO, new ChassisVelocities(0.0, 2.0, 0.0));
+
+    var compensated = kCompensating.calculateShot(snapshot, kTarget, ShotProfile.kScoring);
+    var uncompensated = kUncompensated.calculateShot(snapshot, kTarget, ShotProfile.kScoring);
+
+    assertTrue(
+        compensated.targetTurretAngle().in(Degrees) < -1.0,
+        "sanity: the compensated shot should lead");
+    assertEquals(
+        0.0,
+        uncompensated.targetTurretAngle().in(Degrees),
+        kEpsilonDegrees,
+        "with compensation off the bearing should point straight at the target");
+    // The range must fall back to the real target too, not stay at the virtual one.
+    assertEquals(
+        stationary().targetFlywheelSpeed().baseUnitMagnitude(),
+        uncompensated.targetFlywheelSpeed().baseUnitMagnitude(),
+        1e-9);
+  }
+
+  @Test
+  void theToggleIsReadOnEveryCallNotCachedAtConstruction() {
+    // A dashboard flip has to take effect on the next solution, not at the next reboot.
+    var live = new boolean[] {true};
+    var calculator = new ShotCalculationUtil(() -> live[0]);
+    var snapshot = new TurretSnapshot(
+        kTurretPosition, Rotation2d.ZERO, new ChassisVelocities(0.0, 2.0, 0.0));
+
+    double leading = calculator.calculateShot(snapshot, kTarget, ShotProfile.kScoring)
+        .targetTurretAngle().in(Degrees);
+    live[0] = false;
+    double straight = calculator.calculateShot(snapshot, kTarget, ShotProfile.kScoring)
+        .targetTurretAngle().in(Degrees);
+
+    assertTrue(leading < -1.0, "sanity: should lead while the toggle is on");
+    assertEquals(0.0, straight, kEpsilonDegrees);
   }
 
   @Test

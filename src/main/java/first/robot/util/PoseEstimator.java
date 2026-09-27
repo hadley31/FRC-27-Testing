@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
 import org.littletonrobotics.junction.Logger;
-import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Pose3d;
 import org.wpilib.math.geometry.Rotation2d;
@@ -35,8 +34,8 @@ import first.robot.util.Constants.RobotGeometryConstants;
  *
  * <p>The two optional behaviours — scaling odometry down when the robot is tilted, and clamping the
  * estimate inside the field walls — are injected as predicates rather than read from NetworkTables
- * here, so the filter stays independent of the dashboard. {@link #withTunableToggles} wires them to
- * live toggles for robot use.
+ * here, so the filter stays independent of the dashboard and testable without one. On the robot,
+ * pass {@code Tuning.kOdometryTiltCompensation} and {@code Tuning.kWallClamp}.
  */
 public class PoseEstimator {
   private static final double kPoseBufferSizeSec = 2.0;
@@ -72,14 +71,6 @@ public class PoseEstimator {
     for (int i = 0; i < 3; ++i) {
       m_qStdDevs.set(i, 0, Math.pow(kOdometryStdDevs.get(i, 0), 2));
     }
-  }
-
-  /** An estimator whose optional behaviours are driven by dashboard toggles. */
-  public static PoseEstimator withTunableToggles(SwerveDriveKinematics kinematics) {
-    var tiltCompensation = new LoggedNetworkBoolean("Toggles/OdometryTiltCompensation", false);
-    var wallClamp = new LoggedNetworkBoolean("Toggles/WallClamp", true);
-
-    return new PoseEstimator(kinematics, tiltCompensation::get, wallClamp::get);
   }
 
   /** Reset the pose estimate and odometry pose to the given pose. */

@@ -34,7 +34,7 @@ public class CompetitionAutoFactory {
         m_robot.drive::getPose,
         m_robot.drive::resetPose,
         m_robot.drive::followSample,
-        false,
+        true,
         m_robot.drive,
         (trajectory, isStart) -> {
           if (isStart) {

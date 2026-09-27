@@ -6,7 +6,6 @@ import static org.wpilib.units.Units.Seconds;
 import java.util.Optional;
 
 import org.littletonrobotics.junction.Logger;
-import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
 import org.wpilib.command3.Trigger;
 import org.wpilib.command3.button.RobotModeTriggers;
 import org.wpilib.driverstation.Alliance;
@@ -33,8 +32,10 @@ import first.robot.mechanism.drive.Drive;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
+import first.robot.mechanism.vision.AprilTagVision;
 import first.robot.util.Constants.RobotGeometryConstants;
 import first.robot.util.FieldConstants;
+import first.robot.util.Tuning;
 import first.robot.util.TurretSnapshot;
 
 /**
@@ -55,6 +56,7 @@ public class RobotState {
   private final Turret m_turret;
   private final Hood m_hood;
   private final Flywheel m_flywheel;
+  private final AprilTagVision m_vision;
 
   private final Trigger m_isPreparedToShootTrigger;
   private final Trigger m_isFeedingTrigger;
@@ -62,19 +64,15 @@ public class RobotState {
 
   private final Field2d m_field2d = new Field2d();
 
-  private final LoggedNetworkBoolean m_fixedTurretModeToggle =
-      new LoggedNetworkBoolean("Toggles/FixedTurretMode", false);
-  private final LoggedNetworkBoolean m_autoAimToggle =
-      new LoggedNetworkBoolean("Toggles/AutoAim", false);
+  private final TimeInterpolatableBuffer<Pose2d> m_robotPoseBuffer = TimeInterpolatableBuffer
+      .createBuffer(kPoseBufferSeconds);
 
-  private final TimeInterpolatableBuffer<Pose2d> m_robotPoseBuffer =
-      TimeInterpolatableBuffer.createBuffer(kPoseBufferSeconds);
-
-  public RobotState(Drive drive, Turret turret, Hood hood, Flywheel flywheel) {
+  public RobotState(Drive drive, Turret turret, Hood hood, Flywheel flywheel, AprilTagVision vision) {
     m_drive = drive;
     m_turret = turret;
     m_hood = hood;
     m_flywheel = flywheel;
+    m_vision = vision;
 
     m_inAllianceZoneTrigger = new Trigger(this::inAllianceZone)
         .debounce(Seconds.of(0.2), DebounceType.FALLING);
@@ -217,8 +215,7 @@ public class RobotState {
     ChassisVelocities robotSpeeds = getFieldRelativeSpeeds();
 
     // v = omega x r, with r the mounting offset rotated into the field frame.
-    Translation2d leverArm =
-        RobotGeometryConstants.kRobotToTurret.rotateBy(robotPose.getRotation());
+    Translation2d leverArm = RobotGeometryConstants.kRobotToTurret.rotateBy(robotPose.getRotation());
 
     return robotSpeeds.plus(new ChassisVelocities(
         -leverArm.getY() * robotSpeeds.omega,
@@ -267,15 +264,15 @@ public class RobotState {
   // MARK: - Driver toggles
 
   public void setFixedTurretMode(boolean enabled) {
-    m_fixedTurretModeToggle.set(enabled);
+    Tuning.kFixedTurretMode.set(enabled);
   }
 
   public boolean isFixedTurretModeEnabled() {
-    return m_fixedTurretModeToggle.get();
+    return Tuning.kFixedTurretMode.getAsBoolean();
   }
 
   public boolean isAutoAimEnabled() {
-    return m_autoAimToggle.get();
+    return Tuning.kAutoAim.getAsBoolean();
   }
 
   public boolean isAutoAimAndFixedTurretModeEnabled() {

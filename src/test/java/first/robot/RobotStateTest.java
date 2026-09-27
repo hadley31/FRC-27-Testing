@@ -15,14 +15,15 @@ import org.wpilib.math.geometry.Translation2d;
 import org.wpilib.math.kinematics.ChassisVelocities;
 
 import first.lib.mechanism.TunableGains;
-import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 import first.lib.mechanism.angle.AngleMechanismIO;
-import first.lib.mechanism.angularvelocity.AngularVelocityMechanismInputsAutoLogged;
+import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismIO;
+import first.lib.mechanism.angularvelocity.AngularVelocityMechanismInputsAutoLogged;
 import first.robot.mechanism.drive.Drive;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
+import first.robot.mechanism.vision.AprilTagVision;
 import first.robot.util.Constants.RobotGeometryConstants;
 import first.robot.util.FieldConstants;
 import first.robot.util.TurretSnapshot;
@@ -112,7 +113,7 @@ class RobotStateTest {
     m_drive = new FakeDrive();
     m_turret = new Turret(new StubAngleIO());
     m_state = new RobotState(
-        m_drive, m_turret, new Hood(new StubAngleIO()), new Flywheel(new StubVelocityIO()));
+        m_drive, m_turret, new Hood(new StubAngleIO()), new Flywheel(new StubVelocityIO()), new AprilTagVision());
     return m_state;
   }
 
@@ -178,8 +179,7 @@ class RobotStateTest {
     double omega = 1.5;
     m_drive.m_fieldRelativeSpeeds = new ChassisVelocities(0.0, 0.0, omega);
 
-    ChassisVelocities velocity =
-        state.getTurretSnapshot(Seconds.zero()).fieldRelativeVelocity();
+    ChassisVelocities velocity = state.getTurretSnapshot(Seconds.zero()).fieldRelativeVelocity();
 
     // v = omega x r. Spinning in place still sweeps the turret, which is what shoot-on-the-move has
     // to cancel; treating the chassis velocity as the turret's would miss it entirely.
@@ -193,8 +193,7 @@ class RobotStateTest {
     var state = newState();
     m_drive.m_fieldRelativeSpeeds = new ChassisVelocities(1.0, -2.0, 0.0);
 
-    ChassisVelocities velocity =
-        state.getTurretSnapshot(Seconds.zero()).fieldRelativeVelocity();
+    ChassisVelocities velocity = state.getTurretSnapshot(Seconds.zero()).fieldRelativeVelocity();
 
     assertEquals(1.0, velocity.vx, kEpsilon);
     assertEquals(-2.0, velocity.vy, kEpsilon);

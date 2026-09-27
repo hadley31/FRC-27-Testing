@@ -17,11 +17,14 @@ import org.wpilib.command3.button.RobotModeTriggers;
 
 import first.lib.mechanism.angle.TalonFXAngleMechanismIO;
 import first.lib.mechanism.angularvelocity.TalonFXAngularVelocityMechanismIO;
+import first.lib.tuning.Toggle;
 import first.robot.mechanism.drive.Drive;
 import first.robot.mechanism.feeder.Feeder;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
+import first.robot.mechanism.vision.AprilTagCameraIOPhotonVision;
+import first.robot.mechanism.vision.AprilTagVision;
 import first.robot.mode.CompetitionAutoFactory;
 import first.robot.mode.CompetitionTeleopFactory;
 import first.robot.util.Constants;
@@ -42,6 +45,7 @@ public class Robot extends LoggedRobot {
   public final Turret turret;
   public final Hood hood;
   public final Feeder feeder;
+  public final AprilTagVision vision;
   public final RobotState state;
 
   public Robot() {
@@ -54,7 +58,8 @@ public class Robot extends LoggedRobot {
     turret = new Turret(new TalonFXAngleMechanismIO(1, CAN_BUS));
     hood = new Hood(new TalonFXAngleMechanismIO(2, CAN_BUS));
     feeder = new Feeder(new TalonFXAngularVelocityMechanismIO(3, CAN_BUS));
-    state = new RobotState(drive, turret, hood, flywheel);
+    vision = new AprilTagVision(new AprilTagCameraIOPhotonVision("Camera1"));
+    state = new RobotState(drive, turret, hood, flywheel, vision);
 
     var teleopFactory = new CompetitionTeleopFactory(this);
     var autoFactory = new CompetitionAutoFactory(this);
@@ -62,6 +67,9 @@ public class Robot extends LoggedRobot {
 
     RobotModeTriggers.autonomous().whileTrue(autoChooser.selectedCommandScheduler());
     RobotModeTriggers.teleop().whileTrue(teleopFactory.getTeleopCommand());
+
+    Scheduler.getDefault().addPeriodic(state::periodic);
+    Scheduler.getDefault().addPeriodic(() -> Toggle.logNonDefaults());
   }
 
   private void configureLogging() {
@@ -89,6 +97,5 @@ public class Robot extends LoggedRobot {
   @Override
   public void robotPeriodic() {
     Scheduler.getDefault().run();
-    state.periodic();
   }
 }

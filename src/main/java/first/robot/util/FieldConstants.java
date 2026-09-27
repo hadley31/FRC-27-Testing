@@ -2,6 +2,8 @@ package first.robot.util;
 
 import static org.wpilib.units.Units.Meters;
 
+import org.wpilib.fields.Field;
+import org.wpilib.fields.Fields;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.geometry.Translation2d;
@@ -11,10 +13,14 @@ import org.wpilib.units.measure.Distance;
 import choreo.util.ChoreoAllianceFlipUtil.Flipper;
 
 public final class FieldConstants {
-  public static final Distance FIELD_LENGTH = Meters.of(5);
-  public static final Distance FIELD_WIDTH = Meters.of(3);
+  public static final Field FIELD = Fields.DEFAULT_FIELD.loadField();
+  public static final Distance FIELD_LENGTH = Meters.of(FIELD.getFieldLength());
+  public static final Distance FIELD_WIDTH = Meters.of(FIELD.getFieldWidth());
 
-  private static final Translation3d HUB_POSITION = new Translation3d(0.0, 0.0, 0.0);
+  private static final Translation3d HUB_POSITION = new Translation3d(
+      4.6256194,
+      FIELD_WIDTH.in(Meters) / 2.0,
+      1.8);
 
   private FieldConstants() {
   }
@@ -37,7 +43,7 @@ public final class FieldConstants {
    * @param robotWidth the robot's Y extent including bumpers
    */
   public static Pose2d clampToFieldBounds(Pose2d pose, Distance robotLength, Distance robotWidth) {
-    // Half-extents of the axis-aligned bounding box of the rotated robot rectangle. For an L x W
+    // Half-extents of the rotated robot rectangle. For an L x W
     // rectangle rotated by theta:
     //   halfExtentX = (|L*cos| + |W*sin|) / 2
     //   halfExtentY = (|L*sin| + |W*cos|) / 2

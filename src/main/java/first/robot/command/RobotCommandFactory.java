@@ -8,12 +8,12 @@ import first.robot.Robot;
 import first.robot.util.FieldConstants;
 import first.robot.util.ShotCalculationUtil;
 import first.robot.util.ShotParameters;
-import first.robot.util.ShotProfile;
+import first.robot.util.Tuning;
 
 public class RobotCommandFactory {
-  private static final ShotProfile kShotProfile = ShotProfile.kScoring;
-
   private final Robot m_robot;
+  private final ShotCalculationUtil m_shotCalculationUtil =
+      new ShotCalculationUtil(Tuning.kVelocityCompensation);
 
   public RobotCommandFactory(Robot robot) {
     m_robot = robot;
@@ -80,9 +80,13 @@ public class RobotCommandFactory {
   }
 
   private ShotParameters calculateShot() {
-    return ShotCalculationUtil.calculateShot(
-        m_robot.state.getTurretSnapshot(kShotProfile.actuationLatency()),
+    // Fetched fresh every solution rather than held in a field: the dashboard can retune this table
+    // while the robot is running, and tuning the actuation latency replaces the profile object.
+    var profile = Tuning.kScoringShotProfile.profile();
+
+    return m_shotCalculationUtil.calculateShot(
+        m_robot.state.getTurretSnapshot(profile.actuationLatency()),
         FieldConstants.getHubPosition3d(),
-        kShotProfile);
+        profile);
   }
 }

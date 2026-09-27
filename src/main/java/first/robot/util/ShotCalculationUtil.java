@@ -4,6 +4,7 @@ import static org.wpilib.units.Units.Meters;
 import static org.wpilib.units.Units.Seconds;
 
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 import org.littletonrobotics.junction.Logger;
 import org.wpilib.math.geometry.Rotation2d;
@@ -25,15 +26,28 @@ import first.lib.InterpolatingMeasureTreeMap;
  * that drift cancels it, and all three lookups are keyed on the range to that virtual target so the
  * hood and flywheel are set up for the range actually being shot.
  *
- * <p>Stateless by design: every input arrives as an argument, so the solution is reproducible from a
- * log and testable without a robot. Latency compensation is <em>not</em> done here — the caller
- * decides which instant the {@link TurretSnapshot} describes.
+ * <p>All robot state arrives per call, so a solution is reproducible from a log and testable without
+ * a robot. The one thing held as instance state is whether velocity compensation is enabled: binding
+ * it once here means no call site can forget to apply it, and injecting it as a supplier keeps the
+ * disabled path reachable from a test — reading the dashboard toggle directly would not, since
+ * AdvantageKit only refreshes its inputs inside a real robot loop.
+ *
+ * <p>Latency compensation is <em>not</em> done here — the caller decides which instant the
+ * {@link TurretSnapshot} describes.
  */
 public final class ShotCalculationUtil {
   private static final Time kTimeOfFlightTolerance = Seconds.of(0.05);
   private static final int kMaximumIterations = 100;
 
-  private ShotCalculationUtil() {
+  private final BooleanSupplier m_velocityCompensationEnabled;
+
+  /**
+   * @param velocityCompensationEnabled whether to lead the target to cancel the velocity fuel
+   *     inherits from a moving turret. On the robot this is {@code Tuning.kVelocityCompensation};
+   *     tests pass a literal.
+   */
+  public ShotCalculationUtil(BooleanSupplier velocityCompensationEnabled) {
+    m_velocityCompensationEnabled = velocityCompensationEnabled;
   }
 
   /**
@@ -41,17 +55,20 @@ public final class ShotCalculationUtil {
    * @param target the field-relative point to put fuel into, alliance-flipped by the caller
    * @param profile the tuning tables to solve against
    */
-  public static ShotParameters calculateShot(
+  public ShotParameters calculateShot(
       TurretSnapshot turret, Translation3d target, ShotProfile profile) {
     Translation2d turretGround = turret.position().toTranslation2d();
 
-    Optional<Translation2d> compensatedTarget = getVelocityCompensatedTarget(
-        turretGround, target.toTranslation2d(), turret.fieldRelativeVelocity(),
-        profile.timeOfFlight());
+    boolean compensate = m_velocityCompensationEnabled.getAsBoolean();
+    Optional<Translation2d> solvedAimPoint = compensate
+        ? getVelocityCompensatedTarget(
+            turretGround, target.toTranslation2d(), turret.fieldRelativeVelocity(),
+            profile.timeOfFlight())
+        : Optional.empty();
 
-    // If the fixed point did not converge, fall back to aiming straight at the target. A stationary
-    // solution is wrong while moving, but it is a far better failure mode than a wild aim point.
-    Translation2d aimPoint = compensatedTarget.orElseGet(target::toTranslation2d);
+    // With compensation off, or if the fixed point did not converge, aim straight at the target. A
+    // stationary solution is wrong while moving, but a far better failure mode than a wild aim point.
+    Translation2d aimPoint = solvedAimPoint.orElseGet(target::toTranslation2d);
 
     // Carry the real target's height onto the virtual aim point so the lookups still see the slant
     // range rather than a ground-plane distance.
@@ -61,7 +78,8 @@ public final class ShotCalculationUtil {
     Logger.recordOutput("ShotCalculation/TurretPosition", turret.position());
     Logger.recordOutput("ShotCalculation/Target", target);
     Logger.recordOutput("ShotCalculation/VirtualTarget", virtualTarget);
-    Logger.recordOutput("ShotCalculation/Converged", compensatedTarget.isPresent());
+    Logger.recordOutput("ShotCalculation/VelocityCompensationEnabled", compensate);
+    Logger.recordOutput("ShotCalculation/VelocityCompensationConverged", solvedAimPoint.isPresent());
     Logger.recordOutput("ShotCalculation/Range", range);
 
     return new ShotParameters(
