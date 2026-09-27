@@ -4,17 +4,17 @@
 
 package first.robot;
 
+import static first.robot.util.Constants.ElectricalConstants.CAN_BUS;
+
 import org.littletonrobotics.junction.LogFileUtil;
+import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 import org.wpilib.command3.Scheduler;
-import org.wpilib.epilogue.Logged;
+import org.wpilib.command3.button.RobotModeTriggers;
 
-import com.ctre.phoenix6.CANBus;
-
-import first.lib.LoggedOpModeRobot;
 import first.lib.mechanism.angle.TalonFXAngleMechanismIO;
 import first.lib.mechanism.angularvelocity.TalonFXAngularVelocityMechanismIO;
 import first.robot.mechanism.drive.Drive;
@@ -22,17 +22,27 @@ import first.robot.mechanism.feeder.Feeder;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
+import first.robot.mode.CompetitionAutoFactory;
+import first.robot.mode.CompetitionTeleopFactory;
 import first.robot.util.Constants;
 
-@Logged
-public class Robot extends LoggedOpModeRobot {
-  private static final CANBus CAN_BUS = new CANBus("CANivore");
-
+/**
+ * A plain {@link LoggedRobot}: AdvantageKit drives the main loop through
+ * {@code IterativeRobotBase}, and the robot modes come from the driver station rather than from
+ * selected opmodes.
+ *
+ * <p>Commands v3 supports this arrangement directly. Bindings made here in the constructor (while
+ * the robot is disabled and no opmode is selected) land in the scheduler's global binding scope, and
+ * bindings made from {@link #autonomousInit()} or {@link #teleopInit()} land in a robot-mode scope
+ * that the scheduler drops on its own when the mode ends.
+ */
+public class Robot extends LoggedRobot {
   public final Drive drive;
   public final Flywheel flywheel;
   public final Turret turret;
   public final Hood hood;
   public final Feeder feeder;
+  public final RobotState state;
 
   public Robot() {
     // AdvantageKit must be configured and started before anything else is constructed, so that IO
@@ -44,13 +54,21 @@ public class Robot extends LoggedOpModeRobot {
     turret = new Turret(new TalonFXAngleMechanismIO(1, CAN_BUS));
     hood = new Hood(new TalonFXAngleMechanismIO(2, CAN_BUS));
     feeder = new Feeder(new TalonFXAngularVelocityMechanismIO(3, CAN_BUS));
+    state = new RobotState(drive, turret, hood, flywheel);
+
+    var teleopFactory = new CompetitionTeleopFactory(this);
+    var autoFactory = new CompetitionAutoFactory(this);
+    var autoChooser = autoFactory.createAutoChooser();
+
+    RobotModeTriggers.autonomous().whileTrue(autoChooser.selectedCommandScheduler());
+    RobotModeTriggers.teleop().whileTrue(teleopFactory.getTeleopCommand());
   }
 
   private void configureLogging() {
-    Logger.recordMetadata("ProjectName", "FRC-Testing-2027");
+    Logger.recordMetadata("ProjectName", "FRC-27-Testing");
     Logger.recordMetadata("RuntimeType", getRuntimeType().toString());
 
-    switch (Constants.kCurrentMode) {
+    switch (Constants.RobotModeConstants.CURRENT_MODE) {
       case REAL -> {
         // Log to a USB stick ("/U/logs") and publish live data to NetworkTables.
         Logger.addDataReceiver(new WPILOGWriter());
@@ -71,5 +89,6 @@ public class Robot extends LoggedOpModeRobot {
   @Override
   public void robotPeriodic() {
     Scheduler.getDefault().run();
+    state.periodic();
   }
 }

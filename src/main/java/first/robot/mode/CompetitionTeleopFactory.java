@@ -1,27 +1,31 @@
-package first.robot.opmode.telelop;
+package first.robot.mode;
 
 import org.wpilib.command3.Command;
-import org.wpilib.command3.Scheduler;
 import org.wpilib.command3.StateMachine;
-import org.wpilib.opmode.PeriodicOpMode;
-import org.wpilib.opmode.Teleop;
 
 import first.robot.Robot;
-import first.robot.command.RobotCommands;
+import first.robot.command.RobotCommandFactory;
 import first.robot.oi.CompetitionDriverControls;
 import first.robot.util.CommandUtil;
 import first.robot.util.SwerveInputStream;
 
-@Teleop(name = "Competition Teleop")
-public class CompetitionTeleopOpMode extends PeriodicOpMode {
+/**
+ * The teleoperated driver experience: controller bindings, the drive default command, and the state
+ * machine that moves the robot between superstructure modes.
+ *
+ * <p>Constructed once from {@link Robot}'s constructor, which is where the default command belongs
+ * so that it is registered in commands v3's global binding scope rather than a per-mode one. The
+ * state machine itself is handed back through {@link #getTeleopCommand()} and scheduled by
+ * {@link Robot#teleopInit()}, so it only runs while the robot is in teleop.
+ */
+public class CompetitionTeleopFactory {
   private final CompetitionDriverControls m_driverControls;
-  private final Robot m_robot;
-  private final RobotCommands m_robotCommands;
+  private final RobotCommandFactory m_robotCommands;
+  private final StateMachine m_stateMachine;
 
-  public CompetitionTeleopOpMode(Robot robot) {
+  public CompetitionTeleopFactory(Robot robot) {
     m_driverControls = new CompetitionDriverControls(0);
-    m_robot = robot;
-    m_robotCommands = new RobotCommands(robot);
+    m_robotCommands = new RobotCommandFactory(robot);
 
     SwerveInputStream swerveInputStream = SwerveInputStream.of(
         m_driverControls::getDriveForward,
@@ -31,16 +35,20 @@ public class CompetitionTeleopOpMode extends PeriodicOpMode {
     Command joystickDriveCommand = robot.drive.driveCommand(swerveInputStream.getNormalDriveSupplier());
 
     robot.drive.setDefaultCommand(joystickDriveCommand);
+
+    m_stateMachine = buildStateMachine();
   }
 
-  @Override
-  public void start() {
-    var result = Scheduler.getDefault().schedule(getCompetitionStateMachine());
-
-    System.out.println(result.successful());
+  /**
+   * Returns the command to run for the duration of teleop.
+   *
+   * @return the driver controls state machine.
+   */
+  public Command getTeleopCommand() {
+    return m_stateMachine;
   }
 
-  private StateMachine getCompetitionStateMachine() {
+  private StateMachine buildStateMachine() {
     var stateMachine = new StateMachine("Driver Controls State Machine");
 
     /*

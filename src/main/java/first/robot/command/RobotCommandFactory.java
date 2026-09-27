@@ -1,23 +1,22 @@
 package first.robot.command;
 
 import static org.wpilib.units.Units.RPM;
-import static org.wpilib.units.Units.Seconds;
 
 import org.wpilib.command3.Command;
-import org.wpilib.command3.Trigger;
-import org.wpilib.math.filter.Debouncer.DebounceType;
 
 import first.robot.Robot;
+import first.robot.util.FieldConstants;
 import first.robot.util.ShotCalculationUtil;
+import first.robot.util.ShotParameters;
+import first.robot.util.ShotProfile;
 
-public class RobotCommands {
+public class RobotCommandFactory {
+  private static final ShotProfile kShotProfile = ShotProfile.kScoring;
+
   private final Robot m_robot;
-  private final ShotCalculationUtil m_shotCalculationUtil;
 
-  public RobotCommands(Robot robot) {
+  public RobotCommandFactory(Robot robot) {
     m_robot = robot;
-    m_shotCalculationUtil = new ShotCalculationUtil(
-        null, null, null);
   }
 
   public Command stowAllMechanisms() {
@@ -60,7 +59,7 @@ public class RobotCommands {
         .requiring(m_robot.flywheel, m_robot.turret, m_robot.hood)
         .executing(coroutine -> {
           while (true) {
-            var parameters = m_shotCalculationUtil.calculateShot();
+            ShotParameters parameters = calculateShot();
 
             m_robot.flywheel.setTarget(parameters.targetFlywheelSpeed());
             m_robot.turret.setTarget(parameters.targetTurretAngle());
@@ -74,19 +73,16 @@ public class RobotCommands {
 
   public Command autoAimAndShoot() {
     return Command.noRequirements(coroutine -> {
-      Trigger shouldFeedFuel = autoShootShouldFeedFuel();
-
-      shouldFeedFuel.whileTrue(feedFuel());
+      m_robot.state.isPreparedToShootTrigger().whileTrue(feedFuel());
 
       coroutine.await(autoAim());
     }).named("Auto Shoot");
   }
 
-  private Trigger autoShootShouldFeedFuel() {
-    return new Trigger(() -> {
-      return m_robot.turret.isNearTarget()
-          && m_robot.flywheel.isNearTarget()
-          && m_robot.hood.isNearTarget();
-    }).debounce(Seconds.of(0.1), DebounceType.FALLING);
+  private ShotParameters calculateShot() {
+    return ShotCalculationUtil.calculateShot(
+        m_robot.state.getTurretSnapshot(kShotProfile.actuationLatency()),
+        FieldConstants.getHubPosition3d(),
+        kShotProfile);
   }
 }

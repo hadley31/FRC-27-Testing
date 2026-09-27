@@ -11,6 +11,7 @@ import org.wpilib.hardware.led.AddressableLEDBuffer;
 import org.wpilib.hardware.led.AddressableLEDBufferView;
 import org.wpilib.hardware.led.LEDPattern;
 import org.wpilib.simulation.AddressableLEDSim;
+import org.wpilib.util.Color;
 
 import first.lib.command3.RangedLEDCommand;
 
@@ -126,6 +127,14 @@ public class LED implements Mechanism {
           m_start,
           m_end,
           false);
+    }
+
+    public NeedsNameBuilderStage solid(Color color) {
+      return runPattern(LEDPattern.solid(color));
+    }
+
+    public NeedsNameBuilderStage off() {
+      return runPattern(LEDPattern.OFF);
     }
 
     /**

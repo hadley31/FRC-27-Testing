@@ -48,14 +48,14 @@ public class SwerveInputStream {
   }
 
   private Supplier<LinearVelocity> getForwardVelocitySupplier() {
-    return () -> Constants.kMaxDriveLinearVelocity.times(m_forwardSupplier.getAsDouble());
+    return () -> Constants.DriveConstants.kMaxLinearVelocity.times(m_forwardSupplier.getAsDouble());
   }
 
   private Supplier<LinearVelocity> getLeftVelocitySupplier() {
-    return () -> Constants.kMaxDriveLinearVelocity.times(m_leftSupplier.getAsDouble());
+    return () -> Constants.DriveConstants.kMaxLinearVelocity.times(m_leftSupplier.getAsDouble());
   }
 
   private Supplier<AngularVelocity> getRotateVelocitySupplier() {
-    return () -> Constants.kMaxDriveAngularVelocity.times(m_rotateSupplier.getAsDouble());
+    return () -> Constants.DriveConstants.kMaxAngularVelocity.times(m_rotateSupplier.getAsDouble());
   }
 }

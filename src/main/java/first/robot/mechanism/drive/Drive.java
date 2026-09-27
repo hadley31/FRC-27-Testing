@@ -28,6 +28,14 @@ public class Drive implements Mechanism {
     return new Pose2d();
   }
 
+  public ChassisVelocities getRobotRelativeSpeeds() {
+    return new ChassisVelocities();
+  }
+
+  public ChassisVelocities getFieldRelativeSpeeds() {
+    return getRobotRelativeSpeeds().toFieldRelative(getPose().getRotation());
+  }
+
   public void resetPose(Pose2d pose) {
 
   }

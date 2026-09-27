@@ -120,7 +120,7 @@ class SchedulerLoggerTest {
         "multi-tick command stayed active after finishing");
   }
 
-  /** Runs one simulated robot cycle, bracketed the way LoggedOpModeRobot brackets a real one. */
+  /** Runs one simulated robot cycle, bracketed the way LoggedRobot brackets a real one. */
   private static void tick(Scheduler scheduler) {
     Logger.AdvancedHooks.invokePeriodicBeforeUser();
     scheduler.run();
