@@ -15,10 +15,21 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 import org.wpilib.command3.Scheduler;
 import org.wpilib.command3.button.RobotModeTriggers;
 
+import com.ctre.phoenix6.configs.CANcoderConfiguration;
+import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.swerve.SwerveModuleConstants;
+
 import first.lib.mechanism.angle.TalonFXAngleMechanismIO;
 import first.lib.mechanism.angularvelocity.TalonFXAngularVelocityMechanismIO;
 import first.lib.tuning.Toggle;
+import first.lib.util.LoggedTracer;
 import first.robot.mechanism.drive.Drive;
+import first.robot.mechanism.drive.GyroIO;
+import first.robot.mechanism.drive.GyroIOPigeon2;
+import first.robot.mechanism.drive.SwerveModuleIO;
+import first.robot.mechanism.drive.SwerveModuleIOSim;
+import first.robot.mechanism.drive.SwerveModuleIOTalonFX;
+import first.robot.mechanism.drive.TunerConstants;
 import first.robot.mechanism.feeder.Feeder;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
@@ -28,6 +39,10 @@ import first.robot.mechanism.vision.AprilTagVision;
 import first.robot.mode.CompetitionAutoFactory;
 import first.robot.mode.CompetitionTeleopFactory;
 import first.robot.util.Constants;
+import first.robot.util.Constants.RobotModeConstants.Mode;
+import first.robot.util.PoseEstimator;
+import first.robot.util.SchedulerLogger;
+import first.robot.util.Tuning;
 
 /**
  * A plain {@link LoggedRobot}: AdvantageKit drives the main loop through
@@ -53,13 +68,21 @@ public class Robot extends LoggedRobot {
     // implementations can log or replay their first set of inputs on the very first cycle.
     configureLogging();
 
-    drive = new Drive();
+    drive = new Drive(
+        createGyroIO(),
+        createSwerveModuleIO(TunerConstants.kFrontLeft),
+        createSwerveModuleIO(TunerConstants.kFrontRight),
+        createSwerveModuleIO(TunerConstants.kBackLeft),
+        createSwerveModuleIO(TunerConstants.kBackRight));
     flywheel = new Flywheel(new TalonFXAngularVelocityMechanismIO(0, CAN_BUS));
     turret = new Turret(new TalonFXAngleMechanismIO(1, CAN_BUS));
     hood = new Hood(new TalonFXAngleMechanismIO(2, CAN_BUS));
     feeder = new Feeder(new TalonFXAngularVelocityMechanismIO(3, CAN_BUS));
     vision = new AprilTagVision(new AprilTagCameraIOPhotonVision("Camera1"));
-    state = new RobotState(drive, turret, hood, flywheel, vision);
+
+    var poseEstimator = new PoseEstimator(drive.getKinematics(), Tuning.kOdometryTiltCompensation, Tuning.kWallClamp);
+
+    state = new RobotState(drive, turret, hood, flywheel, vision, poseEstimator);
 
     var teleopFactory = new CompetitionTeleopFactory(this);
     var autoFactory = new CompetitionAutoFactory(this);
@@ -68,8 +91,23 @@ public class Robot extends LoggedRobot {
     RobotModeTriggers.autonomous().whileTrue(autoChooser.selectedCommandScheduler());
     RobotModeTriggers.teleop().whileTrue(teleopFactory.getTeleopCommand());
 
+    Scheduler.getDefault().addPeriodic(Toggle::logNonDefaults);
     Scheduler.getDefault().addPeriodic(state::periodic);
-    Scheduler.getDefault().addPeriodic(() -> Toggle.logNonDefaults());
+  }
+
+  /** The gyro for the current mode. Simulation runs without one and lets odometry infer heading. */
+  private static GyroIO createGyroIO() {
+    return Constants.RobotModeConstants.CURRENT_MODE == Mode.REAL
+        ? new GyroIOPigeon2(TunerConstants.kPigeonId, CAN_BUS)
+        : new GyroIO() {
+        };
+  }
+
+  private static SwerveModuleIO createSwerveModuleIO(
+      SwerveModuleConstants<TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration> constants) {
+    return Constants.RobotModeConstants.CURRENT_MODE == Mode.REAL
+        ? new SwerveModuleIOTalonFX(constants)
+        : new SwerveModuleIOSim(constants);
   }
 
   private void configureLogging() {
@@ -96,6 +134,16 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void robotPeriodic() {
+    LoggedTracer.reset();
     Scheduler.getDefault().run();
+    LoggedTracer.record("Scheduler/run");
+    SchedulerLogger.refresh(Scheduler.getDefault());
+    LoggedTracer.record("SchedulerLogger/refresh");
+
+    // Every span opened this loop should have been closed by now, so anything still open never
+    // reached its endTrace -- an early return or a thrown exception in between. Dropping them here
+    // keeps a leaked entry from making that name's next measurement run from a stale start, and
+    // publishes the offenders so the mistake is visible.
+    LoggedTracer.clearTraces();
   }
 }

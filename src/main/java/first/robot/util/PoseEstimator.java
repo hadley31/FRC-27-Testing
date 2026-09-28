@@ -6,11 +6,12 @@
 // the root directory of this project.
 package first.robot.util;
 
+import static org.wpilib.units.Units.Seconds;
+
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
-import org.littletonrobotics.junction.Logger;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Pose3d;
 import org.wpilib.math.geometry.Rotation2d;
@@ -25,6 +26,7 @@ import org.wpilib.math.numbers.N1;
 import org.wpilib.math.numbers.N3;
 import org.wpilib.math.util.MathUtil;
 import org.wpilib.math.util.Nat;
+import org.wpilib.units.measure.Time;
 
 import first.robot.util.Constants.RobotGeometryConstants;
 
@@ -101,8 +103,7 @@ public class PoseEstimator {
     observation.yaw().ifPresent(
         gyroAngle -> m_odometryPose = new Pose2d(m_odometryPose.getTranslation(), gyroAngle.plus(m_gyroOffset)));
 
-    Logger.recordOutput("PoseEstimator/odometryPose", m_odometryPose);
-    m_poseBuffer.addSample(observation.timestamp(), m_odometryPose);
+    m_poseBuffer.addSample(observation.timestamp().in(Seconds), m_odometryPose);
 
     // Apply the odometry delta to the vision-corrected estimate. The delta runs from the previous
     // pose to the current one; composing the inverse would walk the estimate backwards.
@@ -113,7 +114,7 @@ public class PoseEstimator {
   public void addVisionObservation(VisionObservation observation) {
     // If measurement is old enough to be outside the pose buffer's timespan, skip.
     try {
-      if (m_poseBuffer.getInternalBuffer().lastKey() - kPoseBufferSizeSec > observation.timestamp()) {
+      if (m_poseBuffer.getInternalBuffer().lastKey() - kPoseBufferSizeSec > observation.timestamp().in(Seconds)) {
         return;
       }
     } catch (NoSuchElementException ex) {
@@ -121,7 +122,7 @@ public class PoseEstimator {
     }
 
     // Get odometry based pose at timestamp
-    var sample = m_poseBuffer.getSample(observation.timestamp());
+    var sample = m_poseBuffer.getSample(observation.timestamp().in(Seconds));
     if (sample.isEmpty()) {
       return;
     }
@@ -200,7 +201,7 @@ public class PoseEstimator {
   // MARK: - Record types
 
   public record OdometryObservation(
-      double timestamp,
+      Time timestamp,
       SwerveModulePosition[] wheelPositions,
       Optional<Rotation2d> pitch,
       Optional<Rotation2d> roll,
@@ -208,7 +209,7 @@ public class PoseEstimator {
   }
 
   public record VisionObservation(
-      double timestamp,
+      Time timestamp,
       Pose3d visionPose,
       Matrix<N3, N1> stdDevs) {
   }

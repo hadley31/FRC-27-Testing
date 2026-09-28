@@ -4,7 +4,7 @@ import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 /**
- * Something that owns a {@link LoggedIO} together with the inputs object that IO fills — typically
+ * Something that owns a {@link LoggedComponentIO} together with the inputs object that IO fills — typically
  * a mechanism.
  *
  * <p>The inputs type appears as a second parameter because Java has no way to project it back out
@@ -17,7 +17,7 @@ import org.littletonrobotics.junction.inputs.LoggableInputs;
  * @param <IO> the IO interface this container talks to
  * @param <I>  the inputs class {@code IO} populates
  */
-public interface LoggedInputContainer<T extends LoggedIO<I>, I extends LoggableInputs> {
+public interface LoggedComponent<T extends LoggedComponentIO<I>, I extends LoggableInputs> {
   /** Returns the IO layer. Use it to command the hardware; use {@link #getInputs()} to read it. */
   public T getIO();
 

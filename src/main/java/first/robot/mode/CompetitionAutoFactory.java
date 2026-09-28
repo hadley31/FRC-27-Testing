@@ -13,6 +13,7 @@ import choreo.auto.AutoRoutine;
 import choreo.auto.AutoTrajectory;
 import first.robot.Robot;
 import first.robot.command.RobotCommandFactory;
+import first.robot.mechanism.drive.DrivePathController;
 
 /**
  * Every autonomous routine the robot can run, sharing one {@link AutoFactory}.
@@ -23,6 +24,7 @@ import first.robot.command.RobotCommandFactory;
  * chooser, which only calls them once the routine is actually selected.
  */
 public class CompetitionAutoFactory {
+  private static final String AUTO_TRAJECTORY_LOG_KEY = "RobotState/Odometry/AutoTrajectory";
   private final Robot m_robot;
   private final RobotCommandFactory m_commands;
   private final AutoFactory m_factory;
@@ -30,17 +32,20 @@ public class CompetitionAutoFactory {
   public CompetitionAutoFactory(Robot robot) {
     m_robot = robot;
     m_commands = new RobotCommandFactory(robot);
+
+    DrivePathController pathController = new DrivePathController(robot.state::getRobotPose, robot.drive::drive);
+
     m_factory = new AutoFactory(
-        m_robot.drive::getPose,
-        m_robot.drive::resetPose,
-        m_robot.drive::followSample,
+        m_robot.state::getRobotPose,
+        m_robot.state::resetPose,
+        pathController::followSample,
         true,
         m_robot.drive,
         (trajectory, isStart) -> {
           if (isStart) {
-            Logger.recordOutput("AutoTrajectory", Pose2d.struct, trajectory.getPoses());
+            Logger.recordOutput(AUTO_TRAJECTORY_LOG_KEY, Pose2d.struct, trajectory.getPoses());
           } else {
-            Logger.recordOutput("AutoTrajectory", Pose2d.struct, new Pose2d[0]);
+            Logger.recordOutput(AUTO_TRAJECTORY_LOG_KEY, Pose2d.struct, new Pose2d[0]);
           }
         });
   }
@@ -75,7 +80,7 @@ public class CompetitionAutoFactory {
           coroutine.await(grabSecondPiece.resetOdometry());
           coroutine.await(m_commands.autoAimAndShoot().withTimeout(Seconds.of(1.5)));
           coroutine.await(grabSecondPiece.cmd());
-          coroutine.await(m_commands.autoAimAndShoot().withTimeout(Seconds.of(1.5)));
+          coroutine.await(m_commands.autoAimAndShoot());
         }).named("Two Piece Auto Sequence"));
 
     return routine;

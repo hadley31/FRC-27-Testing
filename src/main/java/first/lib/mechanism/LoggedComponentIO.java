@@ -12,14 +12,14 @@ package first.lib.mechanism;
  *
  * <p>{@code T} is the plain inputs class, not the generated {@code ...AutoLogged} subclass, so an
  * IO implementation never has to name generated code. The container that owns the IO holds the
- * {@code AutoLogged} subclass and supplies it here; see {@link LoggedInputContainer}.
+ * {@code AutoLogged} subclass and supplies it here; see {@link LoggedComponent}.
  *
  * @param <T> the inputs class this IO populates
  */
-public interface LoggedIO<T> {
+public interface LoggedComponentIO<T> {
   /**
    * Reads the current state of the hardware into {@code inputs}. Called once per loop by
-   * {@link LoggedInputContainer#update()}, before anything reads the inputs.
+   * {@link LoggedComponent#update()}, before anything reads the inputs.
    *
    * @param inputs the inputs object to populate
    */

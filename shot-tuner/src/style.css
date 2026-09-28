@@ -1,0 +1,683 @@
+/*
+ * Tokens first, then roles. Both themes are picked rather than derived: the dark steps are chosen for
+ * the dark surface, not an inversion of the light ones.
+ *
+ * The blue is the data-viz reference palette's slot 1, which validates for lightness band, chroma and
+ * contrast on both surfaces below. Status green and red are reserved for the robot's verdict and always
+ * ship beside a word, never as colour alone.
+ */
+:root {
+  color-scheme: light;
+
+  --plane: #e9f1fb;
+  --surface: #fdfdfe;
+  --surface-2: #f3f7fd;
+  --surface-3: #e7eefa;
+
+  --ink: #0b0f14;
+  --ink-2: #4a5663;
+  --muted: #76838f;
+
+  --grid: #e5ecf6;
+  --axis: #c7d4e3;
+  --ring: rgba(11, 15, 20, 0.1);
+  --ring-strong: rgba(11, 15, 20, 0.16);
+
+  --series: #2a78d6;
+  --series-wash: rgba(42, 120, 214, 0.1);
+  --series-wash-strong: rgba(42, 120, 214, 0.18);
+
+  --good: #0ca30c;
+  --critical: #d03b3b;
+
+  --shadow: 0 1px 2px rgba(11, 15, 20, 0.05), 0 8px 24px -12px rgba(11, 15, 20, 0.16);
+  --radius: 10px;
+  --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+
+    --plane: #0b1018;
+    --surface: #161a20;
+    --surface-2: #1c222b;
+    --surface-3: #232b36;
+
+    --ink: #ffffff;
+    --ink-2: #c3ccd7;
+    --muted: #8492a1;
+
+    --grid: #232b35;
+    --axis: #333d49;
+    --ring: rgba(255, 255, 255, 0.1);
+    --ring-strong: rgba(255, 255, 255, 0.18);
+
+    --series: #3987e5;
+    --series-wash: rgba(57, 135, 229, 0.14);
+    --series-wash-strong: rgba(57, 135, 229, 0.26);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --plane: #0b1018;
+  --surface: #161a20;
+  --surface-2: #1c222b;
+  --surface-3: #232b36;
+
+  --ink: #ffffff;
+  --ink-2: #c3ccd7;
+  --muted: #8492a1;
+
+  --grid: #232b35;
+  --axis: #333d49;
+  --ring: rgba(255, 255, 255, 0.1);
+  --ring-strong: rgba(255, 255, 255, 0.18);
+
+  --series: #3987e5;
+  --series-wash: rgba(57, 135, 229, 0.14);
+  --series-wash-strong: rgba(57, 135, 229, 0.26);
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0 16px 20px;
+  background: var(--plane);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* MARK: - Top bar */
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 16px 0 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  width: 10px;
+  height: 22px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--series), color-mix(in oklab, var(--series) 62%, #000));
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.connection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.field > span {
+  padding-left: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.field input {
+  width: 150px;
+  padding: 7px 9px;
+  border: 1px solid var(--ring);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.field-wide input {
+  width: 240px;
+}
+
+.field-narrow input {
+  width: 92px;
+}
+
+.field input:focus-visible,
+.button:focus-visible,
+.values input:focus-visible {
+  outline: 2px solid var(--series);
+  outline-offset: 1px;
+}
+
+/* MARK: - Buttons */
+
+.button {
+  padding: 8px 12px;
+  border: 1px solid var(--ring);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.button:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.button-primary {
+  border-color: transparent;
+  background: var(--series);
+  color: #fff;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--series) 88%, #000);
+}
+
+.button-icon {
+  width: 36px;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--ring);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  content: '';
+}
+
+.chip.is-live::before {
+  background: var(--good);
+}
+
+.chip.is-connecting::before {
+  background: var(--series);
+}
+
+.chip.is-error::before {
+  background: var(--critical);
+}
+
+/* MARK: - Toolbar */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 4px 0 8px;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--ring);
+}
+
+.hint {
+  max-width: 1180px;
+  margin: 0 auto 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hint kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--ring);
+  border-radius: 4px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 11px;
+}
+
+/* MARK: - Charts */
+
+.charts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.chart-card {
+  padding: 10px 14px 6px;
+  border: 1px solid var(--ring);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-left: 2px;
+}
+
+.chart-title {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+.chart-unit {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  touch-action: none;
+}
+
+.chart-svg.is-disabled {
+  opacity: 0.45;
+}
+
+.chart-hit {
+  cursor: crosshair;
+}
+
+/* Says which of the two gestures is available before the press, not after. */
+.chart-hit.is-over-point {
+  cursor: ns-resize;
+}
+
+.chart-svg.is-disabled .chart-hit,
+.chart-svg.is-disabled .chart-hit.is-over-point {
+  cursor: default;
+}
+
+/* Recessive chrome: hairlines one shade off the surface, never dashed. */
+.gridline {
+  stroke: var(--grid);
+  stroke-width: 1;
+}
+
+.gridline-v {
+  stroke: color-mix(in oklab, var(--grid) 55%, var(--surface));
+}
+
+.baseline {
+  stroke: var(--axis);
+  stroke-width: 1;
+}
+
+.tick {
+  fill: var(--muted);
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tick-y {
+  text-anchor: end;
+}
+
+.tick-x {
+  text-anchor: middle;
+}
+
+.curve-line {
+  fill: none;
+  stroke: var(--series);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.curve-area {
+  fill: var(--series-wash);
+  stroke: none;
+}
+
+/* The hit rect sits above the points, so they never need to take pointer events themselves. */
+.layer-points {
+  pointer-events: none;
+}
+
+.point-dot {
+  fill: var(--series);
+  /* A surface ring rather than a border, so overlapping points stay separable. */
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+/* The point a drag would grab. Nearest-wins selection is invisible without this. */
+.point.is-near .point-dot,
+.point:focus-visible .point-dot {
+  r: 6.5;
+}
+
+/*
+ * The point the keyboard acts on. Deliberately louder than the hover state: it persists after the
+ * pointer has moved away, so it has to answer "what will the arrow keys move?" on its own.
+ */
+.point.is-selected .point-dot {
+  r: 6;
+  fill: var(--surface);
+  stroke: var(--series);
+  stroke-width: 3;
+}
+
+.point:focus {
+  outline: none;
+}
+
+.point:focus-visible .point-dot {
+  stroke: var(--series);
+  stroke-width: 2.5;
+  fill: var(--surface);
+}
+
+.crosshair {
+  stroke: var(--series);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+
+.crosshair-marker {
+  fill: var(--series);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.crosshair-ghost {
+  fill: var(--surface);
+  stroke: var(--series);
+  stroke-width: 2;
+  stroke-dasharray: 3 2.5;
+}
+
+.is-hidden {
+  display: none;
+}
+
+/* MARK: - Tooltip */
+
+.tooltip {
+  position: fixed;
+  z-index: 10;
+  min-width: 156px;
+  padding: 9px 11px;
+  border: 1px solid var(--ring-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 90ms ease;
+}
+
+.tooltip.is-visible {
+  opacity: 1;
+}
+
+.tooltip-range {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--grid);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 1.5px 0;
+}
+
+/* A short stroke of the series colour, not a filled swatch: at this density a block is too much ink. */
+.tooltip-key {
+  width: 11px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--series);
+}
+
+.tooltip-value {
+  color: var(--ink);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.tooltip-label {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tooltip-note {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--grid);
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* MARK: - Table */
+
+.table-panel {
+  max-width: 1180px;
+  margin: 10px auto 0;
+  overflow: hidden;
+  border: 1px solid var(--ring);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.values {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.values th,
+.values td {
+  padding: 6px 12px;
+  text-align: right;
+}
+
+.values th {
+  border-bottom: 1px solid var(--grid);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.values th:last-child,
+.values td:last-child {
+  width: 40px;
+  text-align: center;
+}
+
+.values tbody tr:nth-child(even) {
+  background: var(--surface-2);
+}
+
+.values tbody tr.is-hovered {
+  background: var(--series-wash);
+}
+
+.values input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.values input:hover {
+  border-color: var(--ring);
+}
+
+.values input:disabled {
+  color: var(--muted);
+}
+
+.row-remove {
+  padding: 2px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.row-remove:hover:not(:disabled) {
+  border-color: var(--ring);
+  color: var(--critical);
+}
+
+/* MARK: - Status bar */
+
+.statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  max-width: 1180px;
+  margin: 12px auto 0;
+  padding-left: 2px;
+}
+
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.verdict::before {
+  font-size: 13px;
+}
+
+.verdict.is-good {
+  color: var(--good);
+}
+
+.verdict.is-good::before {
+  content: '✓';
+}
+
+.verdict.is-bad {
+  color: var(--critical);
+}
+
+.verdict.is-bad::before {
+  content: '!';
+}
+
+.verdict.is-idle {
+  color: var(--muted);
+}
+
+.detail {
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+@media (max-width: 720px) {
+  .field input,
+  .field-wide input {
+    width: 100%;
+  }
+
+  .connection {
+    width: 100%;
+  }
+}

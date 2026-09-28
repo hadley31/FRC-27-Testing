@@ -55,11 +55,12 @@ public final record AprilTagPoseObservation(
       }
     }
 
-    public final record ObservationAccepted(AprilTagPoseObservation observation, Vector<N3> stdDevs)
+    public final record AcceptedAprilTagPoseObservation(AprilTagPoseObservation observation, Vector<N3> stdDevs)
         implements AprilTagPoseObservationAccepted {
     }
 
-    public final record AverageTagDistanceTooLarge(AprilTagPoseObservation observation, Distance averageTagDistance)
+    public final record AverageTagDistanceTooLargeRejection(AprilTagPoseObservation observation,
+        Distance averageTagDistance)
         implements AprilTagPoseObservationRejected {
       @Override
       public String getReason() {
@@ -67,7 +68,7 @@ public final record AprilTagPoseObservation(
       }
     }
 
-    public final record ObservedPositionTooHighRejection(AprilTagPoseObservation observation,
+    public final record ObservedPoseTooHighRejection(AprilTagPoseObservation observation,
         Distance distanceAboveGround)
         implements AprilTagPoseObservationRejected {
       @Override
@@ -76,7 +77,7 @@ public final record AprilTagPoseObservation(
       }
     }
 
-    public final record ObservationTooAmbiguous(AprilTagPoseObservation observation, double ambiguity)
+    public final record ObservationTooAmbiguousRejection(AprilTagPoseObservation observation, double ambiguity)
         implements AprilTagPoseObservationRejected {
       @Override
       public String getReason() {
@@ -84,11 +85,11 @@ public final record AprilTagPoseObservation(
       }
     }
 
-    public final record Observation(AprilTagPoseObservation observation, double ambiguity)
+    public final record StaleObservationRejection(AprilTagPoseObservation observation, Time latency)
         implements AprilTagPoseObservationRejected {
       @Override
       public String getReason() {
-        return "Tag result too ambiguous: " + ambiguity;
+        return "Observation too stale: " + latency.toShortString();
       }
     }
   }

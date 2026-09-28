@@ -20,12 +20,16 @@ import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismIO;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismInputsAutoLogged;
 import first.robot.mechanism.drive.Drive;
+import first.robot.mechanism.drive.GyroIO;
+import first.robot.mechanism.drive.SwerveModuleIO;
+import first.robot.mechanism.drive.SwerveModuleIOInputsAutoLogged;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
 import first.robot.mechanism.vision.AprilTagVision;
 import first.robot.util.Constants.RobotGeometryConstants;
 import first.robot.util.FieldConstants;
+import first.robot.util.PoseEstimator;
 import first.robot.util.TurretSnapshot;
 
 /**
@@ -38,24 +42,40 @@ import first.robot.util.TurretSnapshot;
 class RobotStateTest {
   private static final double kEpsilon = 1e-9;
 
-  /** A {@link Drive} whose pose and velocity can be posed by the test. */
+  /**
+   * A {@link Drive} with stubbed IO, whose reported velocity the test can pose. The pose itself now
+   * lives in the {@link PoseEstimator}, so tests set it through {@link RobotState#resetPose}.
+   */
   private static final class FakeDrive extends Drive {
-    private Pose2d m_pose = Pose2d.ZERO;
-    private ChassisVelocities m_fieldRelativeSpeeds = new ChassisVelocities();
+    private ChassisVelocities m_robotRelativeSpeeds = new ChassisVelocities();
 
-    @Override
-    public Pose2d getPose() {
-      return m_pose;
-    }
-
-    @Override
-    public ChassisVelocities getFieldRelativeSpeeds() {
-      return m_fieldRelativeSpeeds;
+    private FakeDrive() {
+      super(new GyroIO() {
+      }, new StubModuleIO(), new StubModuleIO(), new StubModuleIO(), new StubModuleIO());
     }
 
     @Override
     public ChassisVelocities getRobotRelativeSpeeds() {
-      return m_fieldRelativeSpeeds.toRobotRelative(m_pose.getRotation());
+      return m_robotRelativeSpeeds;
+    }
+  }
+
+  /** A module that never moves: stopped, pointed straight ahead, and reporting no odometry. */
+  private static final class StubModuleIO implements SwerveModuleIO {
+    @Override
+    public void updateInputs(SwerveModuleIOInputsAutoLogged inputs) {
+    }
+
+    @Override
+    public void setDriveVelocity(org.wpilib.units.measure.LinearVelocity velocity) {
+    }
+
+    @Override
+    public void setSteerPosition(Rotation2d position) {
+    }
+
+    @Override
+    public void halt() {
     }
   }
 
@@ -112,8 +132,13 @@ class RobotStateTest {
   private RobotState newState() {
     m_drive = new FakeDrive();
     m_turret = new Turret(new StubAngleIO());
+
+    // Tilt compensation and the wall clamp are off so that a posed pose comes back unchanged.
+    var poseEstimator = new PoseEstimator(m_drive.getKinematics(), () -> false, () -> false);
+
     m_state = new RobotState(
-        m_drive, m_turret, new Hood(new StubAngleIO()), new Flywheel(new StubVelocityIO()), new AprilTagVision());
+        m_drive, m_turret, new Hood(new StubAngleIO()), new Flywheel(new StubVelocityIO()),
+        new AprilTagVision(), poseEstimator);
     return m_state;
   }
 
@@ -125,7 +150,7 @@ class RobotStateTest {
   @Test
   void turretPositionIsFieldRelative() {
     var state = newState();
-    m_drive.m_pose = new Pose2d(3.0, 2.0, Rotation2d.ZERO);
+    state.resetPose(new Pose2d(3.0, 2.0, Rotation2d.ZERO));
 
     TurretSnapshot snapshot = state.getTurretSnapshot(Seconds.zero());
     Translation2d expected = new Translation2d(3.0, 2.0).plus(expectedOffset(Rotation2d.ZERO));
@@ -147,7 +172,7 @@ class RobotStateTest {
   @Test
   void mountingOffsetRotatesWithTheChassis() {
     var state = newState();
-    m_drive.m_pose = new Pose2d(0.0, 0.0, Rotation2d.PI);
+    state.resetPose(new Pose2d(0.0, 0.0, Rotation2d.PI));
 
     TurretSnapshot snapshot = state.getTurretSnapshot(Seconds.zero());
     Translation2d expected = expectedOffset(Rotation2d.PI);
@@ -162,7 +187,7 @@ class RobotStateTest {
   @Test
   void snapshotCarriesTheChassisHeadingNotTheTurretHeading() {
     var state = newState();
-    m_drive.m_pose = new Pose2d(0.0, 0.0, Rotation2d.CCW_90DEG);
+    state.resetPose(new Pose2d(0.0, 0.0, Rotation2d.CCW_90DEG));
     m_turret.getInputs().currentAngle = Degrees.of(45);
 
     // The turret setpoint is measured in the robot frame, so the snapshot must expose the chassis
@@ -177,7 +202,7 @@ class RobotStateTest {
   void turretVelocityAddsTheLeverArmTermFromChassisRotation() {
     var state = newState();
     double omega = 1.5;
-    m_drive.m_fieldRelativeSpeeds = new ChassisVelocities(0.0, 0.0, omega);
+    m_drive.m_robotRelativeSpeeds = new ChassisVelocities(0.0, 0.0, omega);
 
     ChassisVelocities velocity = state.getTurretSnapshot(Seconds.zero()).fieldRelativeVelocity();
 
@@ -191,7 +216,7 @@ class RobotStateTest {
   @Test
   void turretVelocityIsTheChassisVelocityWhenNotRotating() {
     var state = newState();
-    m_drive.m_fieldRelativeSpeeds = new ChassisVelocities(1.0, -2.0, 0.0);
+    m_drive.m_robotRelativeSpeeds = new ChassisVelocities(1.0, -2.0, 0.0);
 
     ChassisVelocities velocity = state.getTurretSnapshot(Seconds.zero()).fieldRelativeVelocity();
 
@@ -202,7 +227,7 @@ class RobotStateTest {
   @Test
   void latencyProjectsTheSnapshotForward() {
     var state = newState();
-    m_drive.m_fieldRelativeSpeeds = new ChassisVelocities(2.0, 0.0, 0.0);
+    m_drive.m_robotRelativeSpeeds = new ChassisVelocities(2.0, 0.0, 0.0);
 
     double baseline = state.getTurretSnapshot(Seconds.zero()).position().getX();
     double projected = state.getTurretSnapshot(Seconds.of(0.1)).position().getX();
@@ -214,8 +239,8 @@ class RobotStateTest {
   @Test
   void zeroLatencySnapshotMatchesTheCurrentTurretPose() {
     var state = newState();
-    m_drive.m_pose = new Pose2d(1.0, 1.0, Rotation2d.CCW_90DEG);
-    m_drive.m_fieldRelativeSpeeds = new ChassisVelocities(3.0, 4.0, 1.0);
+    state.resetPose(new Pose2d(1.0, 1.0, Rotation2d.CCW_90DEG));
+    m_drive.m_robotRelativeSpeeds = new ChassisVelocities(3.0, 4.0, 1.0);
 
     Translation2d live = state.getTurretPose().getTranslation();
     var snapshot = state.getTurretSnapshot(Seconds.zero()).position();

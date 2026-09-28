@@ -43,16 +43,22 @@ import first.lib.tuning.TunableDoubleArray;
  *
  * <h2>Published layout</h2>
  *
- * <p>Under the path given, all four columns being arrays of equal length, one entry per range:
+ * <p>The editable columns are plain NetworkTables topics directly under the path given, all four
+ * arrays of equal length with one entry per range:
  *
  * <ul>
  *   <li>{@code DistancesFeet} — the shared range axis, strictly increasing
  *   <li>{@code TimeOfFlightSeconds}, {@code HoodAngleDegrees}, {@code FlywheelRpm} — one curve each
- *   <li>{@code Accepted}, {@code RejectionReason}, {@code IsDefault}, {@code AsJava} — read-only
  * </ul>
+ *
+ * <p>The read-only diagnostics are AdvantageKit outputs, so they appear one level down under
+ * {@code /AdvantageKit/RealOutputs} + the same path: {@code Accepted}, {@code RejectionReason},
+ * {@code IsDefault}, {@code AsJava}, and {@code Default/} + each column name, which is the committed
+ * table a dashboard offers to restore.
  */
 public final class TunableShotProfile extends LoggedNetworkInput {
   private final String m_path;
+  private final String m_outputKey;
   private final ShotProfileTable m_competitionDefault;
   private final TunableDoubleArray m_distances;
   private final TunableDoubleArray m_timeOfFlight;
@@ -61,10 +67,15 @@ public final class TunableShotProfile extends LoggedNetworkInput {
   private final ShotProfile m_profile;
 
   private ShotProfileTable m_accepted;
+  private boolean m_publishedCommitted;
 
   private TunableShotProfile(
       String path, Time actuationLatency, ShotProfileTable competitionDefault, boolean persistent) {
     m_path = path;
+    // Logger.recordOutput keys are relative: it prefixes them with "RealOutputs/" itself, so a leading
+    // slash here would publish to /AdvantageKit/RealOutputs//Tuning/..., which dashboards show as an
+    // unnamed folder. The NT paths the columns publish to are absolute; these keys are not.
+    m_outputKey = path.startsWith("/") ? path.substring(1) : path;
     m_competitionDefault = competitionDefault;
     m_accepted = competitionDefault;
     m_profile = competitionDefault.toProfile(actuationLatency);
@@ -112,6 +123,11 @@ public final class TunableShotProfile extends LoggedNetworkInput {
     return m_profile;
   }
 
+  /** The absolute NT path the editable columns are published under. */
+  public String path() {
+    return m_path;
+  }
+
   /** The table currently in effect, which is the committed one until a dashboard edit is accepted. */
   public ShotProfileTable table() {
     return m_accepted;
@@ -128,6 +144,30 @@ public final class TunableShotProfile extends LoggedNetworkInput {
     m_timeOfFlight.set(m_competitionDefault.timeOfFlightColumn());
     m_hoodAngle.set(m_competitionDefault.hoodAngleColumn());
     m_flywheelVelocity.set(m_competitionDefault.flywheelColumn());
+  }
+
+  /**
+   * Publishes the committed table as a read-only output, once.
+   *
+   * <p>A dashboard cannot otherwise offer "put it back how it shipped": the committed table lives only
+   * in this robot's source, and a persistent tuned table hides it. Exposing it as data rather than as a
+   * reset command keeps the robot free of write-only control topics — the dashboard restores it by
+   * writing these values back through the same validation as any other edit.
+   *
+   * <p>Deferred to the first cycle because {@link Logger} discards outputs recorded before it starts.
+   */
+  private void publishCommittedOnce() {
+    if (m_publishedCommitted) {
+      return;
+    }
+
+    Logger.recordOutput(m_outputKey + "/Default/DistancesFeet", m_competitionDefault.distanceColumn());
+    Logger.recordOutput(
+        m_outputKey + "/Default/TimeOfFlightSeconds", m_competitionDefault.timeOfFlightColumn());
+    Logger.recordOutput(m_outputKey + "/Default/HoodAngleDegrees", m_competitionDefault.hoodAngleColumn());
+    Logger.recordOutput(m_outputKey + "/Default/FlywheelRpm", m_competitionDefault.flywheelColumn());
+
+    m_publishedCommitted = true;
   }
 
   @Override
@@ -149,12 +189,14 @@ public final class TunableShotProfile extends LoggedNetworkInput {
       if (!table.equals(m_accepted)) {
         m_accepted = table;
         table.applyTo(m_profile);
-        Logger.recordOutput(m_path + "/AsJava", table.toJava());
+        Logger.recordOutput(m_outputKey + "/AsJava", table.toJava());
       }
     });
 
-    Logger.recordOutput(m_path + "/Accepted", result.isAccepted());
-    Logger.recordOutput(m_path + "/RejectionReason", result.rejection());
-    Logger.recordOutput(m_path + "/IsDefault", isDefault());
+    publishCommittedOnce();
+
+    Logger.recordOutput(m_outputKey + "/Accepted", result.isAccepted());
+    Logger.recordOutput(m_outputKey + "/RejectionReason", result.rejection());
+    Logger.recordOutput(m_outputKey + "/IsDefault", isDefault());
   }
 }

@@ -2,6 +2,7 @@ plugins {
     id "java"
     id "application"
     id "org.wpilib.GradleRIO" version "2027.0.0-alpha-7"
+    id "com.peterabeles.gversion" version "1.10"
 }
 
 java {
@@ -73,7 +74,9 @@ dependencies {
     systemcoreRelease wpi.java.vendor.jniRelease(wpi.platforms.systemcore)
 
     nativeDebug wpi.java.deps.wpilibJniDebug(wpi.platforms.desktop)
-    nativeDebug wpi.java.vendor.jniDebug(wpi.platforms.desktop)
+    // AdvantageKit only publishes debug natives for linuxsystemcore, so the desktop debug
+    // configuration gets its release natives. Asking for jniDebug here fails to resolve.
+    nativeDebug wpi.java.vendor.jniRelease(wpi.platforms.desktop)
     simulationDebug wpi.sim.enableDebug()
 
     nativeRelease wpi.java.deps.wpilibJniRelease(wpi.platforms.desktop)
@@ -118,3 +121,49 @@ jar {
 tasks.withType(JavaCompile) {
     options.compilerArgs.add '-XDstringConcat=inline'
 }
+
+// Generate BuildConstants.java (git hash, branch, build date) before every compile.
+project.compileJava.dependsOn(createVersionFile)
+gversion {
+    srcDir       = "src/main/java/"
+    classPackage = "first.robot"
+    className    = "BuildConstants"
+    dateFormat   = "yyyy-MM-dd HH:mm:ss z"
+    timeZone     = "America/New_York"
+    indent       = "  "
+}
+
+// Create commit with working changes on event branches
+task(eventDeploy) {
+    doLast {
+        if (project.gradle.startParameter.taskNames.any({ it.toLowerCase().contains("deploy") })) {
+            def branchPrefix = "event"
+            def branch = 'git branch --show-current'.execute().text.trim()
+            def formatter = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss z")
+            formatter.setTimeZone(java.util.TimeZone.getTimeZone("America/New_York"))
+            def commitMessage = "Update at '${formatter.format(new Date())}'"
+
+            if (branch.startsWith(branchPrefix)) {
+                exec {
+                    workingDir(projectDir)
+                    executable 'git'
+                    args 'add', '-A'
+                }
+                exec {
+                    workingDir(projectDir)
+                    executable 'git'
+                    args 'commit', '-m', commitMessage
+                    ignoreExitValue = true
+                }
+
+                println "Committed to branch: '$branch'"
+                println "Commit message: '$commitMessage'"
+            } else {
+                println "Not on an event branch, skipping commit"
+            }
+        } else {
+            println "Not running deploy task, skipping commit"
+        }
+    }
+}
+createVersionFile.dependsOn(eventDeploy)

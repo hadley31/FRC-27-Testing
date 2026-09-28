@@ -4,9 +4,9 @@ import org.littletonrobotics.junction.AutoLog;
 import org.wpilib.math.geometry.Pose3d;
 import org.wpilib.units.measure.Time;
 
-import first.lib.mechanism.LoggedIO;
+import first.lib.mechanism.LoggedComponentIO;
 
-public interface AprilTagCameraIO extends LoggedIO<AprilTagCameraIOInputsAutoLogged> {
+public interface AprilTagCameraIO extends LoggedComponentIO<AprilTagCameraIOInputsAutoLogged> {
   @AutoLog
   public static class AprilTagCameraIOInputs {
     public Time timestamp = null;

@@ -1,0 +1,43 @@
+diff --git a/src/lib/socket/socket.js b/src/lib/socket/socket.js
+index 0397769770302b3e3ef98a40b977eff08b981e33..181fd3c13308df6fa526b87f8e74ad65f7e03ce0 100644
+--- a/src/lib/socket/socket.js
++++ b/src/lib/socket/socket.js
+@@ -81,6 +81,17 @@ var NetworkTablesSocket = /** @class */ (function () {
+             // Open handler
+             this._websocket.onopen = function () {
+                 // Setup heartbeat or RTT
++                // PATCH: start the timestamp heartbeat on 4.1 as well as 4.0.
++                // The 4.1 branch used to skip it, on the assumption that the separate
++                // rtt.networktables.first.wpi.edu subprotocol would carry RTT messages -- but no such
++                // socket is ever opened here. With no id=-1 exchange, handleRTT never runs, so offset
++                // stays 0 and bestRtt stays -1, and getServerTime() returns raw performance.now()
++                // microseconds: a few seconds of page uptime instead of the server's time base.
++                // Every published value is then stamped far in the past, so the server keeps its
++                // retained value and the robot's own subscribers discard the update as stale. Writes
++                // appear to succeed (other clients even see them broadcast live) while the robot never
++                // reads them. The spec requires clients to send these messages periodically regardless
++                // of version; 4.1 only prefers WebSocket PING for *aliveness*, which is a separate job.
+                 if (_this._websocket.protocol === 'v4.1.networktables.first.wpi.edu') {
+                     // eslint-disable-next-line no-console
+                     console.info('Connected on NT 4.1');
+@@ -88,14 +99,13 @@ var NetworkTablesSocket = /** @class */ (function () {
+                 else {
+                     // eslint-disable-next-line no-console
+                     console.info('Connected on NT 4.0');
+-                    // Start heartbeat
+-                    // Only send heartbeat at this rate if we are on NT 4.0
+-                    heartbeatInterval = setInterval(function () {
+-                        if (_this.isConnected()) {
+-                            _this.heartbeat();
+-                        }
+-                    }, NetworkTablesSocket.RTT_PERIOD_V4_0);
+                 }
++                _this.heartbeat();
++                heartbeatInterval = setInterval(function () {
++                    if (_this.isConnected()) {
++                        _this.heartbeat();
++                    }
++                }, NetworkTablesSocket.RTT_PERIOD_V4_0);
+                 // eslint-disable-next-line no-console
+                 console.info('Robot Connected!');
+                 _this.updateConnectionListeners();

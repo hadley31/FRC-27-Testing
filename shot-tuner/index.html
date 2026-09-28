@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shot Tuner</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <h1>Shot Tuner</h1>
+      </div>
+
+      <div class="connection">
+        <label class="field">
+          <span>Robot</span>
+          <input id="address" type="text" spellcheck="false" autocomplete="off" placeholder="localhost" />
+        </label>
+        <label class="field field-wide">
+          <span>Profile</span>
+          <input id="path" type="text" spellcheck="false" autocomplete="off" />
+        </label>
+        <button id="connect" class="button button-primary" type="button">Connect</button>
+        <span id="status" class="chip" role="status">Offline</span>
+        <button id="theme" class="button button-icon" type="button" title="Switch light and dark" aria-label="Switch light and dark">◐</button>
+      </div>
+    </header>
+
+    <div class="toolbar" role="group" aria-label="Table actions">
+      <label class="field field-narrow">
+        <span>Add range</span>
+        <input id="add-range" type="number" step="0.5" min="0" inputmode="decimal" />
+      </label>
+      <button id="add" class="button" type="button">Add</button>
+
+      <span class="toolbar-divider" aria-hidden="true"></span>
+
+      <button id="undo" class="button" type="button" title="Undo (Ctrl+Z)">Undo</button>
+      <button id="redo" class="button" type="button" title="Redo (Ctrl+Shift+Z)">Redo</button>
+      <button id="revert" class="button" type="button" title="Back to the table this page loaded">Revert edits</button>
+      <button id="reset" class="button" type="button" title="Back to the table committed in ShotProfile.java">Reset to committed</button>
+
+      <span class="toolbar-spacer"></span>
+
+      <button id="copy" class="button" type="button">Copy as Java</button>
+      <button id="toggle-table" class="button" type="button" aria-expanded="false">Show values</button>
+    </div>
+
+    <p class="hint">
+      Click empty space to add a range · drag a point to change it, <kbd>Shift</kbd>-drag for fine steps ·
+      <kbd>Shift</kbd>-click a point to level it between its neighbours
+      <br />
+      Click a point to select it, then <kbd>↑</kbd><kbd>↓</kbd> nudge (<kbd>Shift</kbd> for ×10),
+      <kbd>←</kbd><kbd>→</kbd> move between ranges, <kbd>L</kbd> levels, <kbd>Delete</kbd> removes,
+      <kbd>Esc</kbd> deselects
+    </p>
+
+    <main id="charts" class="charts"></main>
+
+    <section id="table-panel" class="table-panel" hidden>
+      <table class="values">
+        <caption class="sr-only">Every range in the shot table, with its three values</caption>
+        <thead>
+          <tr>
+            <th scope="col">Range (ft)</th>
+            <th scope="col">Flight (s)</th>
+            <th scope="col">Hood (°)</th>
+            <th scope="col">Flywheel (RPM)</th>
+            <th scope="col"><span class="sr-only">Remove</span></th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </section>
+
+    <footer class="statusbar">
+      <span id="verdict" class="verdict"></span>
+      <span id="detail" class="detail"></span>
+    </footer>
+
+    <div id="tooltip" class="tooltip" role="tooltip" aria-hidden="true"></div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

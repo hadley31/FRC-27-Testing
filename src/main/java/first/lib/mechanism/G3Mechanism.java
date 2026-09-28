@@ -10,7 +10,7 @@ import org.wpilib.command3.Trigger;
 import org.wpilib.units.Measure;
 
 public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInputs, U extends Measure<?>>
-    extends Mechanism, LoggedInputContainer<T, I> {
+    extends Mechanism, LoggedComponent<T, I> {
   @Override
   public default String getLogName() {
     return getName();

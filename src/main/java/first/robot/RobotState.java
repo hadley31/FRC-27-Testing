@@ -10,6 +10,7 @@ import org.wpilib.command3.Trigger;
 import org.wpilib.command3.button.RobotModeTriggers;
 import org.wpilib.driverstation.Alliance;
 import org.wpilib.driverstation.MatchState;
+import org.wpilib.fields.Fields;
 import org.wpilib.math.filter.Debouncer.DebounceType;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Rotation2d;
@@ -21,13 +22,14 @@ import org.wpilib.math.geometry.Twist2d;
 import org.wpilib.math.interpolation.TimeInterpolatableBuffer;
 import org.wpilib.math.kinematics.ChassisVelocities;
 import org.wpilib.smartdashboard.Field2d;
-import org.wpilib.system.Timer;
+import org.wpilib.system.RobotController;
 import org.wpilib.tunable.Tunables;
 import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 import org.wpilib.units.measure.Time;
 
 import first.lib.util.GeometryUtil;
+import first.robot.command.AprilTagVisionProcessor;
 import first.robot.mechanism.drive.Drive;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
@@ -35,6 +37,7 @@ import first.robot.mechanism.turret.Turret;
 import first.robot.mechanism.vision.AprilTagVision;
 import first.robot.util.Constants.RobotGeometryConstants;
 import first.robot.util.FieldConstants;
+import first.robot.util.PoseEstimator;
 import first.robot.util.Tuning;
 import first.robot.util.TurretSnapshot;
 
@@ -57,22 +60,30 @@ public class RobotState {
   private final Hood m_hood;
   private final Flywheel m_flywheel;
   private final AprilTagVision m_vision;
+  private final PoseEstimator m_poseEstimator;
 
   private final Trigger m_isPreparedToShootTrigger;
   private final Trigger m_isFeedingTrigger;
   private final Trigger m_inAllianceZoneTrigger;
+
+  private final AprilTagVisionProcessor m_visionProcessor;
 
   private final Field2d m_field2d = new Field2d();
 
   private final TimeInterpolatableBuffer<Pose2d> m_robotPoseBuffer = TimeInterpolatableBuffer
       .createBuffer(kPoseBufferSeconds);
 
-  public RobotState(Drive drive, Turret turret, Hood hood, Flywheel flywheel, AprilTagVision vision) {
+  public RobotState(Drive drive, Turret turret, Hood hood, Flywheel flywheel, AprilTagVision vision,
+      PoseEstimator poseEstimator) {
     m_drive = drive;
     m_turret = turret;
     m_hood = hood;
     m_flywheel = flywheel;
     m_vision = vision;
+    m_poseEstimator = poseEstimator;
+
+    m_visionProcessor = new AprilTagVisionProcessor(Fields.DEFAULT_FIELD.loadField(),
+        m_poseEstimator::addVisionObservation);
 
     m_inAllianceZoneTrigger = new Trigger(this::inAllianceZone)
         .debounce(Seconds.of(0.2), DebounceType.FALLING);
@@ -93,25 +104,30 @@ public class RobotState {
   }
 
   public void periodic() {
-    double timestamp = Timer.getTimestamp();
+    // Handle odometry and vision observations
+    m_drive.getOdometryObservations().forEach(m_poseEstimator::addOdometryObservation);
+    m_visionProcessor.process(m_vision.getLatestObservations());
+
+    Time timestamp = RobotController.getMeasureMonotonicTime();
     Pose2d robotPose = getRobotPose();
 
-    Logger.recordOutput("RobotState/FixedTurretModeEnabled", isFixedTurretModeEnabled());
-    Logger.recordOutput("RobotState/AutoAimEnabled", isAutoAimEnabled());
-    Logger.recordOutput("RobotState/InAllianceZone", m_inAllianceZoneTrigger.getAsBoolean());
-    Logger.recordOutput("RobotState/IsPreparedToShoot", m_isPreparedToShootTrigger.getAsBoolean());
-    Logger.recordOutput("RobotState/IsFeeding", m_isFeedingTrigger.getAsBoolean());
-    Logger.recordOutput("RobotState/TurretPose", getTurretPose());
-    Logger.recordOutput("RobotState/FieldRelativeSpeeds", getFieldRelativeSpeeds());
-    Logger.recordOutput("RobotState/FieldRelativeTurretSpeeds", getFieldRelativeTurretSpeeds());
+    Logger.recordOutput("RobotState/Toggles/FixedTurretModeEnabled", isFixedTurretModeEnabled());
+    Logger.recordOutput("RobotState/Toggles/AutoAimEnabled", isAutoAimEnabled());
+    Logger.recordOutput("RobotState/Triggers/InAllianceZone", m_inAllianceZoneTrigger.getAsBoolean());
+    Logger.recordOutput("RobotState/Triggers/IsPreparedToShoot", m_isPreparedToShootTrigger.getAsBoolean());
+    Logger.recordOutput("RobotState/Triggers/IsFeeding", m_isFeedingTrigger.getAsBoolean());
+    Logger.recordOutput("RobotState/Geometry/TurretPose", getTurretPose());
+    Logger.recordOutput("RobotState/Odometry/FieldRelativeSpeeds", getFieldRelativeSpeeds());
+    Logger.recordOutput("RobotState/Odometry/FieldRelativeTurretSpeeds", getFieldRelativeTurretSpeeds());
+    Logger.recordOutput("RobotState/Odometry/RobotPose", getRobotPose());
 
     differentiatePose(timestamp, robotPose).ifPresent(speeds -> {
-      Logger.recordOutput("RobotState/PoseDerivedRobotRelativeSpeeds", speeds);
-      Logger.recordOutput("RobotState/PoseDerivedFieldRelativeSpeeds",
+      Logger.recordOutput("RobotState/Experimental/PoseDerivedRobotRelativeSpeeds", speeds);
+      Logger.recordOutput("RobotState/Experimental/PoseDerivedFieldRelativeSpeeds",
           speeds.toFieldRelative(robotPose.getRotation()));
     });
 
-    m_robotPoseBuffer.addSample(timestamp, robotPose);
+    m_robotPoseBuffer.addSample(timestamp.in(Seconds), robotPose);
     m_field2d.setRobotPose(robotPose);
   }
 
@@ -120,13 +136,13 @@ public class RobotState {
    *
    * @return empty on the first cycle, or when two samples share a timestamp
    */
-  private Optional<ChassisVelocities> differentiatePose(double timestamp, Pose2d robotPose) {
+  private Optional<ChassisVelocities> differentiatePose(Time timestamp, Pose2d robotPose) {
     var previous = m_robotPoseBuffer.getInternalBuffer().lastEntry();
     if (previous == null) {
       return Optional.empty();
     }
 
-    double dt = timestamp - previous.getKey();
+    double dt = timestamp.in(Seconds) - previous.getKey();
     if (dt <= 0.0) {
       return Optional.empty();
     }
@@ -138,7 +154,11 @@ public class RobotState {
   // MARK: - Pose
 
   public Pose2d getRobotPose() {
-    return m_drive.getPose();
+    return m_poseEstimator.getEstimatedPose();
+  }
+
+  public void resetPose(Pose2d pose) {
+    m_poseEstimator.resetPose(m_drive.getRawGyroAngle(), m_drive.getModulePositions(), pose);
   }
 
   /** The robot pose projected forward by {@code seconds} of its current motion. */
@@ -200,7 +220,7 @@ public class RobotState {
   }
 
   public ChassisVelocities getFieldRelativeSpeeds() {
-    return m_drive.getFieldRelativeSpeeds();
+    return getRobotRelativeSpeeds().toFieldRelative(getRobotPose().getRotation());
   }
 
   public ChassisVelocities getFieldRelativeTurretSpeeds() {

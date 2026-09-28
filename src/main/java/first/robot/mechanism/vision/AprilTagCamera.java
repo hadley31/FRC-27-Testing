@@ -3,9 +3,9 @@ package first.robot.mechanism.vision;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-import first.lib.mechanism.LoggedInputContainer;
+import first.lib.mechanism.LoggedComponent;
 
-public class AprilTagCamera implements LoggedInputContainer<AprilTagCameraIO, AprilTagCameraIOInputsAutoLogged> {
+public class AprilTagCamera implements LoggedComponent<AprilTagCameraIO, AprilTagCameraIOInputsAutoLogged> {
   private final String m_name;
   private final String m_logName;
   private final AprilTagCameraIO m_io;
