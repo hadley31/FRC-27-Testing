@@ -8,6 +8,7 @@ import static org.wpilib.units.Units.Seconds;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.wpilib.driverstation.internal.DriverStationBackend;
+import org.wpilib.fields.Fields;
 import org.wpilib.hardware.hal.HAL;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Rotation2d;
@@ -26,7 +27,7 @@ import first.robot.mechanism.drive.SwerveModuleIOInputsAutoLogged;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
-import first.robot.mechanism.vision.AprilTagVision;
+import first.robot.mechanism.vision.apriltag.AprilTagVision;
 import first.robot.util.Constants.RobotGeometryConstants;
 import first.robot.util.FieldConstants;
 import first.robot.util.PoseEstimator;
@@ -138,7 +139,7 @@ class RobotStateTest {
 
     m_state = new RobotState(
         m_drive, m_turret, new Hood(new StubAngleIO()), new Flywheel(new StubVelocityIO()),
-        new AprilTagVision(), poseEstimator);
+        new AprilTagVision(), poseEstimator, Fields.DEFAULT_FIELD.loadField());
     return m_state;
   }
 

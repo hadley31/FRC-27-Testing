@@ -11,7 +11,6 @@ import java.util.stream.Stream;
 
 import org.littletonrobotics.junction.Logger;
 import org.wpilib.command3.Command;
-import org.wpilib.command3.Mechanism;
 import org.wpilib.driverstation.RobotState;
 import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.kinematics.ChassisVelocities;
@@ -35,7 +34,7 @@ import first.robot.util.PoseEstimator.OdometryObservation;
  * vision observations are, so that the estimator has exactly one owner and the drivetrain has no
  * opinion about where it is. Path following lives in {@link DrivePathController}.
  */
-public class Drive implements Mechanism, LoggedMultiComponentMechanism {
+public class Drive implements LoggedMultiComponentMechanism {
   /** The period module setpoints are discretized over, which is the rate the scheduler runs at. */
   static final Time kLoopPeriod = Seconds.of(0.02);
 

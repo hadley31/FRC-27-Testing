@@ -10,7 +10,7 @@ import org.wpilib.command3.Trigger;
 import org.wpilib.command3.button.RobotModeTriggers;
 import org.wpilib.driverstation.Alliance;
 import org.wpilib.driverstation.MatchState;
-import org.wpilib.fields.Fields;
+import org.wpilib.fields.Field;
 import org.wpilib.math.filter.Debouncer.DebounceType;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Rotation2d;
@@ -29,12 +29,12 @@ import org.wpilib.units.measure.AngularVelocity;
 import org.wpilib.units.measure.Time;
 
 import first.lib.util.GeometryUtil;
-import first.robot.command.AprilTagVisionProcessor;
 import first.robot.mechanism.drive.Drive;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
-import first.robot.mechanism.vision.AprilTagVision;
+import first.robot.mechanism.vision.apriltag.AprilTagVision;
+import first.robot.mechanism.vision.apriltag.AprilTagVisionProcessor;
 import first.robot.util.Constants.RobotGeometryConstants;
 import first.robot.util.FieldConstants;
 import first.robot.util.PoseEstimator;
@@ -73,8 +73,15 @@ public class RobotState {
   private final TimeInterpolatableBuffer<Pose2d> m_robotPoseBuffer = TimeInterpolatableBuffer
       .createBuffer(kPoseBufferSeconds);
 
+  /**
+   * @param field the tag layout the vision filter measures tag distances against. Passed in rather
+   *              than loaded here so that it is the same layout instance the cameras solve against:
+   *              a second load would be a second copy to keep in step, and a filter judging
+   *              observations by a layout the cameras never used would be judging them by the wrong
+   *              field.
+   */
   public RobotState(Drive drive, Turret turret, Hood hood, Flywheel flywheel, AprilTagVision vision,
-      PoseEstimator poseEstimator) {
+      PoseEstimator poseEstimator, Field field) {
     m_drive = drive;
     m_turret = turret;
     m_hood = hood;
@@ -82,8 +89,11 @@ public class RobotState {
     m_vision = vision;
     m_poseEstimator = poseEstimator;
 
-    m_visionProcessor = new AprilTagVisionProcessor(Fields.DEFAULT_FIELD.loadField(),
-        m_poseEstimator::addVisionObservation);
+    // The drivetrain's own velocity, not the velocity implied by the estimate: the vision filter
+    // uses it to price timestamp error, and reading it from the estimate would make how much an
+    // observation is trusted depend on the estimate that observation is about to correct.
+    m_visionProcessor = new AprilTagVisionProcessor(
+        field, m_drive::getRobotRelativeSpeeds, m_poseEstimator::addVisionObservation);
 
     m_inAllianceZoneTrigger = new Trigger(this::inAllianceZone)
         .debounce(Seconds.of(0.2), DebounceType.FALLING);
@@ -108,7 +118,7 @@ public class RobotState {
     m_drive.getOdometryObservations().forEach(m_poseEstimator::addOdometryObservation);
     m_visionProcessor.process(m_vision.getLatestObservations());
 
-    Time timestamp = RobotController.getMeasureMonotonicTime();
+    Time timestamp = RobotController.getMeasureTime();
     Pose2d robotPose = getRobotPose();
 
     Logger.recordOutput("RobotState/Toggles/FixedTurretModeEnabled", isFixedTurretModeEnabled());
@@ -120,6 +130,7 @@ public class RobotState {
     Logger.recordOutput("RobotState/Odometry/FieldRelativeSpeeds", getFieldRelativeSpeeds());
     Logger.recordOutput("RobotState/Odometry/FieldRelativeTurretSpeeds", getFieldRelativeTurretSpeeds());
     Logger.recordOutput("RobotState/Odometry/RobotPose", getRobotPose());
+    Logger.recordOutput("RobotState/Odometry/SimRobotPose", m_poseEstimator.getOdometryPose());
 
     differentiatePose(timestamp, robotPose).ifPresent(speeds -> {
       Logger.recordOutput("RobotState/Experimental/PoseDerivedRobotRelativeSpeeds", speeds);

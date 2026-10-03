@@ -14,9 +14,9 @@ public class DrivePathController {
   private final Supplier<Pose2d> m_poseSupplier;
   private final Consumer<ChassisVelocities> m_velocitiesConsumer;
 
-  private final PIDController m_pathXController = new PIDController(1.0, 0.0, 0.0);
-  private final PIDController m_pathYController = new PIDController(1.0, 0.0, 0.0);
-  private final PIDController m_pathThetaController = new PIDController(1.0, 0.0, 0.0);
+  private final PIDController m_pathXController = new PIDController(7.0, 0.0, 0.0);
+  private final PIDController m_pathYController = new PIDController(7.0, 0.0, 0.0);
+  private final PIDController m_pathThetaController = new PIDController(7.0, 0.0, 0.0);
 
   public DrivePathController(Supplier<Pose2d> poseSupplier, Consumer<ChassisVelocities> velocitiesConsumer) {
     m_poseSupplier = poseSupplier;

@@ -4,6 +4,8 @@ import static org.wpilib.units.Units.Seconds;
 
 import org.littletonrobotics.junction.Logger;
 import org.wpilib.command3.Command;
+import org.wpilib.driverstation.Alliance;
+import org.wpilib.driverstation.MatchState;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.tunable.Tunables;
 
@@ -42,8 +44,10 @@ public class CompetitionAutoFactory {
         true,
         m_robot.drive,
         (trajectory, isStart) -> {
+          boolean shouldFlip = MatchState.getAlliance().orElse(Alliance.BLUE).equals(Alliance.RED);
+          var traj = shouldFlip ? trajectory.flipped() : trajectory;
           if (isStart) {
-            Logger.recordOutput(AUTO_TRAJECTORY_LOG_KEY, Pose2d.struct, trajectory.getPoses());
+            Logger.recordOutput(AUTO_TRAJECTORY_LOG_KEY, Pose2d.struct, traj.getPoses());
           } else {
             Logger.recordOutput(AUTO_TRAJECTORY_LOG_KEY, Pose2d.struct, new Pose2d[0]);
           }

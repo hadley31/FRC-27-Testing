@@ -19,7 +19,7 @@ import com.ctre.phoenix6.hardware.Pigeon2;
 import first.lib.mechanism.PhoenixUtil;
 
 public class GyroIOPigeon2 implements GyroIO {
-  private static final double kConnectedDebounceSeconds = 0.5;
+  private static final double kConnectedDebounceSeconds = 0.1;
 
   private final Pigeon2 m_pigeon2;
   private final StatusSignal<Angle> m_yawSignal;

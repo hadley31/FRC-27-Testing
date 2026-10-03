@@ -14,6 +14,8 @@ import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 import org.wpilib.command3.Scheduler;
 import org.wpilib.command3.button.RobotModeTriggers;
+import org.wpilib.fields.Field;
+import org.wpilib.fields.Fields;
 
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
@@ -34,12 +36,13 @@ import first.robot.mechanism.feeder.Feeder;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
-import first.robot.mechanism.vision.AprilTagCameraIOPhotonVision;
-import first.robot.mechanism.vision.AprilTagVision;
+import first.robot.mechanism.vision.apriltag.AprilTagVision;
+import first.robot.mechanism.vision.apriltag.AprilTagVisionFactory;
 import first.robot.mode.CompetitionAutoFactory;
 import first.robot.mode.CompetitionTeleopFactory;
 import first.robot.util.Constants;
 import first.robot.util.Constants.RobotModeConstants.Mode;
+import first.robot.util.Constants.VisionConstants;
 import first.robot.util.PoseEstimator;
 import first.robot.util.SchedulerLogger;
 import first.robot.util.Tuning;
@@ -78,11 +81,25 @@ public class Robot extends LoggedRobot {
     turret = new Turret(new TalonFXAngleMechanismIO(1, CAN_BUS));
     hood = new Hood(new TalonFXAngleMechanismIO(2, CAN_BUS));
     feeder = new Feeder(new TalonFXAngularVelocityMechanismIO(3, CAN_BUS));
-    vision = new AprilTagVision(new AprilTagCameraIOPhotonVision("Camera1"));
 
     var poseEstimator = new PoseEstimator(drive.getKinematics(), Tuning.kOdometryTiltCompensation, Tuning.kWallClamp);
 
-    state = new RobotState(drive, turret, hood, flywheel, vision, poseEstimator);
+    Field field = Fields.DEFAULT_FIELD.loadField();
+
+    // The two poses handed over here are deliberately different. A single-tag solve wants the best
+    // heading available, which is the fused estimate: the trig solve returns the heading it was
+    // given, so an observation built on the estimate disagrees with it about rotation by nothing and
+    // leaves heading to the multi-tag solves that can actually measure it. The simulated cameras,
+    // on the other hand, must be posed from odometry, because rendering sightings from the
+    // vision-corrected pose would only ever confirm the correction they were rendered from.
+    vision = AprilTagVisionFactory.create(
+        Constants.RobotModeConstants.CURRENT_MODE,
+        field,
+        VisionConstants.kCameras,
+        () -> poseEstimator.getEstimatedPose().getRotation(),
+        poseEstimator::getOdometryPose);
+
+    state = new RobotState(drive, turret, hood, flywheel, vision, poseEstimator, field);
 
     var teleopFactory = new CompetitionTeleopFactory(this);
     var autoFactory = new CompetitionAutoFactory(this);

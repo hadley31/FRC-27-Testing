@@ -89,6 +89,15 @@ public class PoseEstimator {
     return m_estimatedPose;
   }
 
+  /**
+   * The pose from wheel travel alone, with no vision correction applied. Useful as the truth a
+   * vision simulation renders from: the vision-corrected estimate cannot serve there, because
+   * generating sightings from it would only ever confirm what the filter already believes.
+   */
+  public Pose2d getOdometryPose() {
+    return m_odometryPose;
+  }
+
   /** Adds a new odometry observation from the drive subsystem. */
   public void addOdometryObservation(OdometryObservation observation) {
     Twist2d twist = m_kinematics.toTwist2d(m_lastWheelPositions, observation.wheelPositions());
