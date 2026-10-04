@@ -13,9 +13,11 @@ import org.wpilib.math.filter.Debouncer;
 import org.wpilib.math.filter.Debouncer.DebounceType;
 import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.kinematics.SwerveModulePosition;
+import org.wpilib.math.system.DCMotor;
 import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 import org.wpilib.units.measure.Current;
+import org.wpilib.units.measure.Force;
 import org.wpilib.units.measure.LinearVelocity;
 import org.wpilib.units.measure.Voltage;
 
@@ -48,6 +50,14 @@ import first.lib.mechanism.PhoenixUtil;
  * way round.
  */
 public class SwerveModuleIOTalonFX implements SwerveModuleIO {
+  /**
+   * The drive motor, for its torque constant and winding resistance only.
+   *
+   * <p>Must match the motor actually fitted: those two numbers are what convert a wanted force into
+   * a current or a voltage, and nothing checks that the model agrees with the hardware.
+   */
+  private static final DCMotor kDriveMotor = DCMotor.getKrakenX60Foc(1);
+
   private static final double kConnectedDebounceSeconds = 0.5;
 
   private final SwerveModuleConstants<TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration> m_constants;
@@ -58,6 +68,8 @@ public class SwerveModuleIOTalonFX implements SwerveModuleIO {
   private final TalonFX m_driveMotor;
   private final TalonFX m_steerMotor;
   private final CANcoder m_steerEncoder;
+
+  private final DriveForceFeedforward m_feedforward;
 
   private final VelocityVoltage m_driveVelocityVoltage = new VelocityVoltage(0.0);
   private final VelocityTorqueCurrentFOC m_driveVelocityTorqueCurrent = new VelocityTorqueCurrentFOC(0.0);
@@ -90,6 +102,8 @@ public class SwerveModuleIOTalonFX implements SwerveModuleIO {
       SwerveModuleConstants<TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration> constants) {
     m_constants = constants;
     m_metersPerWheelRotation = 2.0 * Math.PI * constants.WheelRadius;
+    m_feedforward = new DriveForceFeedforward(
+        Meters.of(constants.WheelRadius), constants.DriveMotorGearRatio, kDriveMotor);
 
     m_driveMotor = new TalonFX(constants.DriveMotorId, CAN_BUS);
     m_steerMotor = new TalonFX(constants.SteerMotorId, CAN_BUS);
@@ -224,12 +238,19 @@ public class SwerveModuleIOTalonFX implements SwerveModuleIO {
   }
 
   @Override
-  public void setDriveVelocity(LinearVelocity velocity) {
+  public void setDriveVelocity(LinearVelocity velocity, Force tractionForce) {
     double wheelRotationsPerSecond = velocity.in(MetersPerSecond) / m_metersPerWheelRotation;
 
     m_driveMotor.setControl(switch (m_constants.DriveMotorClosedLoopOutput) {
-      case Voltage -> m_driveVelocityVoltage.withVelocity(wheelRotationsPerSecond);
-      case TorqueCurrentFOC -> m_driveVelocityTorqueCurrent.withVelocity(wheelRotationsPerSecond);
+      // Each request takes the feedforward in its own output units, which is the whole reason the
+      // conversion is a measure rather than a bare double.
+      case Voltage -> m_driveVelocityVoltage
+          .withVelocity(wheelRotationsPerSecond)
+          .withFeedForward(m_feedforward.forMotorVoltage(tractionForce));
+
+      case TorqueCurrentFOC -> m_driveVelocityTorqueCurrent
+          .withVelocity(wheelRotationsPerSecond)
+          .withFeedForward(m_feedforward.forMotorCurrent(tractionForce));
     });
   }
 

@@ -3,6 +3,7 @@ package first.robot.mechanism.drive;
 import static org.wpilib.units.Units.Amps;
 import static org.wpilib.units.Units.Meters;
 import static org.wpilib.units.Units.MetersPerSecond;
+import static org.wpilib.units.Units.Newtons;
 import static org.wpilib.units.Units.RadiansPerSecond;
 import static org.wpilib.units.Units.Volts;
 
@@ -12,6 +13,7 @@ import org.wpilib.math.kinematics.SwerveModulePosition;
 import org.wpilib.units.measure.AngularVelocity;
 import org.wpilib.units.measure.Current;
 import org.wpilib.units.measure.Distance;
+import org.wpilib.units.measure.Force;
 import org.wpilib.units.measure.LinearVelocity;
 import org.wpilib.units.measure.Voltage;
 
@@ -56,8 +58,27 @@ public interface SwerveModuleIO extends LoggedComponentIO<SwerveModuleIOInputsAu
     public SwerveModulePosition[] odometryPositions = new SwerveModulePosition[0];
   }
 
-  /** Runs the wheel at {@code velocity} measured at the contact patch. */
-  public void setDriveVelocity(LinearVelocity velocity);
+  /** Runs the wheel at {@code velocity} measured at the contact patch, with nothing fed forward. */
+  public default void setDriveVelocity(LinearVelocity velocity) {
+    setDriveVelocity(velocity, Newtons.zero());
+  }
+
+  /**
+   * Runs the wheel at {@code velocity} measured at the contact patch, with {@code tractionForce}
+   * fed forward.
+   *
+   * <p>The force is what the contact patch should be pushing the robot with along the wheel's
+   * rolling direction, signed the same way as {@code velocity}. A trajectory knows this: it was
+   * planned against a mass and a set of motors, so it can say what force each corner has to produce
+   * to stay on the path, and saying so is strictly better than leaving the velocity controller to
+   * discover it from the error it has already accumulated.
+   *
+   * <p>Newtons rather than amps or volts because force is the part the planner knows and the part
+   * that is true of any hardware. Turning it into something a motor controller accepts needs the
+   * wheel radius, the gearing and the motor's torque constant, all of which belong to the
+   * implementation.
+   */
+  public void setDriveVelocity(LinearVelocity velocity, Force tractionForce);
 
   /** Points the azimuth at {@code position}, taking the shorter way round. */
   public void setSteerPosition(Rotation2d position);

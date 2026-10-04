@@ -68,7 +68,8 @@ class RobotStateTest {
     }
 
     @Override
-    public void setDriveVelocity(org.wpilib.units.measure.LinearVelocity velocity) {
+    public void setDriveVelocity(
+        org.wpilib.units.measure.LinearVelocity velocity, org.wpilib.units.measure.Force tractionForce) {
     }
 
     @Override

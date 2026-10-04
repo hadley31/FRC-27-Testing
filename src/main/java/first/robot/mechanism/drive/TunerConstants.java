@@ -65,8 +65,8 @@ public final class TunerConstants {
       .withKS(0.0)
       .withKV(0.124);
 
-  private static final ClosedLoopOutputType kSteerClosedLoopOutput = ClosedLoopOutputType.Voltage;
-  private static final ClosedLoopOutputType kDriveClosedLoopOutput = ClosedLoopOutputType.Voltage;
+  private static final ClosedLoopOutputType kSteerClosedLoopOutput = ClosedLoopOutputType.TorqueCurrentFOC;
+  private static final ClosedLoopOutputType kDriveClosedLoopOutput = ClosedLoopOutputType.TorqueCurrentFOC;
 
   // MARK: - Hardware
 
@@ -106,28 +106,27 @@ public final class TunerConstants {
 
   // MARK: - Modules
 
-  private static final SwerveModuleConstantsFactory<TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration> kModuleFactory =
-      new SwerveModuleConstantsFactory<TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration>()
-          .withDriveMotorGearRatio(kDriveGearRatio)
-          .withSteerMotorGearRatio(kSteerGearRatio)
-          .withCouplingGearRatio(kCouplingGearRatio)
-          .withWheelRadius(kWheelRadius)
-          .withDriveMotorGains(kDriveGains)
-          .withSteerMotorGains(kSteerGains)
-          .withDriveMotorClosedLoopOutput(kDriveClosedLoopOutput)
-          .withSteerMotorClosedLoopOutput(kSteerClosedLoopOutput)
-          .withSlipCurrent(kSlipCurrent)
-          .withSpeedAt12Volts(kSpeedAt12Volts)
-          .withDriveMotorType(kDriveMotorType)
-          .withSteerMotorType(kSteerMotorType)
-          .withFeedbackSource(kSteerFeedbackType)
-          .withDriveMotorInitialConfigs(kDriveInitialConfigs)
-          .withSteerMotorInitialConfigs(kSteerInitialConfigs)
-          .withEncoderInitialConfigs(kEncoderInitialConfigs)
-          .withDriveInertia(kDriveInertia)
-          .withSteerInertia(kSteerInertia)
-          .withDriveFrictionVoltage(kDriveFrictionVoltage)
-          .withSteerFrictionVoltage(kSteerFrictionVoltage);
+  private static final SwerveModuleConstantsFactory<TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration> kModuleFactory = new SwerveModuleConstantsFactory<TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration>()
+      .withDriveMotorGearRatio(kDriveGearRatio)
+      .withSteerMotorGearRatio(kSteerGearRatio)
+      .withCouplingGearRatio(kCouplingGearRatio)
+      .withWheelRadius(kWheelRadius)
+      .withDriveMotorGains(kDriveGains)
+      .withSteerMotorGains(kSteerGains)
+      .withDriveMotorClosedLoopOutput(kDriveClosedLoopOutput)
+      .withSteerMotorClosedLoopOutput(kSteerClosedLoopOutput)
+      .withSlipCurrent(kSlipCurrent)
+      .withSpeedAt12Volts(kSpeedAt12Volts)
+      .withDriveMotorType(kDriveMotorType)
+      .withSteerMotorType(kSteerMotorType)
+      .withFeedbackSource(kSteerFeedbackType)
+      .withDriveMotorInitialConfigs(kDriveInitialConfigs)
+      .withSteerMotorInitialConfigs(kSteerInitialConfigs)
+      .withEncoderInitialConfigs(kEncoderInitialConfigs)
+      .withDriveInertia(kDriveInertia)
+      .withSteerInertia(kSteerInertia)
+      .withDriveFrictionVoltage(kDriveFrictionVoltage)
+      .withSteerFrictionVoltage(kSteerFrictionVoltage);
 
   private static final boolean kInvertLeftSide = false;
   private static final boolean kInvertRightSide = true;

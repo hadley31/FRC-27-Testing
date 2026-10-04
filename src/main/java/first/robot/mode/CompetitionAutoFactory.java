@@ -26,7 +26,7 @@ import first.robot.mechanism.drive.DrivePathController;
  * chooser, which only calls them once the routine is actually selected.
  */
 public class CompetitionAutoFactory {
-  private static final String AUTO_TRAJECTORY_LOG_KEY = "RobotState/Odometry/AutoTrajectory";
+  private static final String AUTO_TRAJECTORY_LOG_KEY = "RobotState/Odometry/Trajectory/TrajectoryPoses";
   private final Robot m_robot;
   private final RobotCommandFactory m_commands;
   private final AutoFactory m_factory;

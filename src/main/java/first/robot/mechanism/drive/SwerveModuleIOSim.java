@@ -14,6 +14,7 @@ import org.wpilib.math.system.DCMotor;
 import org.wpilib.math.system.Models;
 import org.wpilib.simulation.DCMotorSim;
 import org.wpilib.system.Timer;
+import org.wpilib.units.measure.Force;
 import org.wpilib.units.measure.LinearVelocity;
 
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
@@ -44,6 +45,7 @@ public class SwerveModuleIOSim implements SwerveModuleIO {
 
   /** Metres of travel per radian of wheel rotation, which for a rolling wheel is its radius. */
   private final double m_metersPerWheelRadian;
+  private final DriveForceFeedforward m_feedforward;
 
   private final DCMotorSim m_driveSim;
   private final DCMotorSim m_steerSim;
@@ -60,6 +62,8 @@ public class SwerveModuleIOSim implements SwerveModuleIO {
   public SwerveModuleIOSim(
       SwerveModuleConstants<TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration> constants) {
     m_metersPerWheelRadian = constants.WheelRadius;
+    m_feedforward = new DriveForceFeedforward(
+        Meters.of(constants.WheelRadius), constants.DriveMotorGearRatio, kDriveGearbox);
 
     m_driveSim = new DCMotorSim(
         Models.singleJointedArmFromPhysicalConstants(
@@ -113,12 +117,15 @@ public class SwerveModuleIOSim implements SwerveModuleIO {
   }
 
   @Override
-  public void setDriveVelocity(LinearVelocity velocity) {
+  public void setDriveVelocity(LinearVelocity velocity, Force tractionForce) {
     double wheelRadiansPerSecond = velocity.in(MetersPerSecond) / m_metersPerWheelRadian;
 
+    // Volts rather than amps because there is nothing here but a voltage to apply: the sim has no
+    // motor controller to hand a torque current request to.
     m_driveClosedLoop = true;
     m_driveFeedforwardVolts = kDriveKs * Math.signum(wheelRadiansPerSecond)
-        + kDriveKv * wheelRadiansPerSecond;
+        + kDriveKv * wheelRadiansPerSecond
+        + m_feedforward.forMotorVoltage(tractionForce).in(Volts);
     m_driveController.setSetpoint(wheelRadiansPerSecond);
   }
 

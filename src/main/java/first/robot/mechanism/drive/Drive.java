@@ -13,6 +13,7 @@ import org.littletonrobotics.junction.Logger;
 import org.wpilib.command3.Command;
 import org.wpilib.driverstation.RobotState;
 import org.wpilib.math.geometry.Rotation2d;
+import org.wpilib.math.geometry.Translation2d;
 import org.wpilib.math.kinematics.ChassisVelocities;
 import org.wpilib.math.kinematics.SwerveDriveKinematics;
 import org.wpilib.math.kinematics.SwerveModulePosition;
@@ -37,6 +38,9 @@ import first.robot.util.PoseEstimator.OdometryObservation;
 public class Drive implements LoggedMultiComponentMechanism {
   /** The period module setpoints are discretized over, which is the rate the scheduler runs at. */
   static final Time kLoopPeriod = Seconds.of(0.02);
+
+  /** For driving on velocity alone, with no trajectory to say what force that ought to take. */
+  private static final Translation2d[] kNoModuleForces = new Translation2d[0];
 
   private final Gyro m_gyro;
   private final SwerveModule[] m_modules;
@@ -110,21 +114,48 @@ public class Drive implements LoggedMultiComponentMechanism {
    * @param velocities the velocity to hold until the next call
    */
   public void drive(ChassisVelocities velocities) {
+    drive(velocities, kNoModuleForces);
+  }
+
+  /**
+   * Drives the robot at the given robot-relative velocity, feeding forward the force each module is
+   * expected to be producing.
+   *
+   * <p>A velocity alone leaves the module controllers to discover the force needed to achieve it
+   * from the error it has already cost them. A trajectory planned against the robot's mass knows
+   * that force in advance, so handing it over turns the module controllers from the thing that
+   * produces the acceleration into the thing that corrects it.
+   *
+   * @param velocities                 the velocity to hold until the next call
+   * @param robotRelativeModuleForces  the force each module should exert on the robot, in newtons,
+   *                                   in module order. Shorter than the module count, including
+   *                                   empty, means the rest get nothing fed forward.
+   */
+  public void drive(ChassisVelocities velocities, Translation2d[] robotRelativeModuleForces) {
     // Holding a velocity for a whole loop while also rotating traces an arc, not the straight line
     // the naive inverse kinematics assume; discretizing corrects for the difference.
     ChassisVelocities setpoint = velocities.discretize(kLoopPeriod.in(Seconds));
 
+    // Note that the forces are deliberately not scaled alongside a desaturated velocity. Force is
+    // not proportional to velocity, so there is no factor that would be correct, and a path that
+    // saturates the modules is one the planner thought was feasible and was wrong about -- a
+    // slightly optimistic feedforward is not what has gone wrong in that moment.
     SwerveModuleVelocity[] setpoints = SwerveDriveKinematics.desaturateWheelVelocities(
         m_kinematics.toSwerveModuleVelocities(setpoint), TunerConstants.kSpeedAt12Volts);
 
     SwerveModuleVelocity[] applied = new SwerveModuleVelocity[m_modules.length];
     for (int i = 0; i < m_modules.length; i++) {
-      applied[i] = m_modules[i].setVelocity(setpoints[i]);
+      Translation2d force = i < robotRelativeModuleForces.length
+          ? robotRelativeModuleForces[i]
+          : Translation2d.ZERO;
+
+      applied[i] = m_modules[i].setVelocity(setpoints[i], force);
     }
 
     Logger.recordOutput("Drive/ChassisVelocities/Setpoint", setpoint);
     Logger.recordOutput("Drive/ModuleVelocities/Setpoints", setpoints);
     Logger.recordOutput("Drive/ModuleVelocities/SetpointsOptimized", applied);
+    Logger.recordOutput("Drive/ModuleForces/Setpoints", robotRelativeModuleForces);
   }
 
   public SwerveDriveKinematics getKinematics() {

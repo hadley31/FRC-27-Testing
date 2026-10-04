@@ -1,10 +1,14 @@
 package first.robot.mechanism.drive;
 
 import static org.wpilib.units.Units.MetersPerSecond;
+import static org.wpilib.units.Units.Newtons;
 
+import org.littletonrobotics.junction.Logger;
 import org.wpilib.math.geometry.Rotation2d;
+import org.wpilib.math.geometry.Translation2d;
 import org.wpilib.math.kinematics.SwerveModulePosition;
 import org.wpilib.math.kinematics.SwerveModuleVelocity;
+import org.wpilib.units.measure.Force;
 
 import first.lib.mechanism.LoggedComponent;
 
@@ -47,10 +51,40 @@ public class SwerveModule implements LoggedComponent<SwerveModuleIO, SwerveModul
    * @return the setpoint that was actually applied, which is what belongs in the log
    */
   public SwerveModuleVelocity setVelocity(SwerveModuleVelocity setpoint) {
-    SwerveModuleVelocity applied = setpoint.optimize(getAngle()).cosineScale(getAngle());
+    return setVelocity(setpoint, Translation2d.ZERO);
+  }
 
-    m_io.setDriveVelocity(MetersPerSecond.of(applied.velocity));
+  /**
+   * As {@link #setVelocity(SwerveModuleVelocity)}, and additionally feeds forward the force this
+   * corner of the robot is supposed to be pushing with.
+   *
+   * @param setpoint           where to point and how fast to spin
+   * @param robotRelativeForce the force this module should be exerting on the robot, as a
+   *                           robot-relative vector in newtons. A trajectory supplies these; zero is
+   *                           the right value when nothing does.
+   * @return the setpoint that was actually applied, which is what belongs in the log
+   */
+  public SwerveModuleVelocity setVelocity(
+      SwerveModuleVelocity setpoint, Translation2d robotRelativeForce) {
+    Rotation2d angle = getAngle();
+    SwerveModuleVelocity applied = setpoint.optimize(angle).cosineScale(angle);
+
+    // Only the component along the wheel's rolling direction can be produced by driving the wheel.
+    // Whatever is left over is held by the tyre gripping sideways and is no business of this motor,
+    // which is why a module being pushed around a corner correctly asks for almost nothing: its
+    // force is nearly all perpendicular to the way it rolls.
+    //
+    // Projected onto where the azimuth actually is rather than where it is being sent, for two
+    // reasons. It is the honest answer about what this wheel can presently exert, and it is what
+    // makes the sign come out right after the setpoint has been optimized: a module the optimizer
+    // reversed gets a negated velocity, and projecting onto the unchanged physical angle negates
+    // the force to match.
+    Force traction = Newtons.of(robotRelativeForce.rotateBy(angle.unaryMinus()).getX());
+
+    m_io.setDriveVelocity(MetersPerSecond.of(applied.velocity), traction);
     m_io.setSteerPosition(applied.angle);
+
+    Logger.recordOutput(m_logName + "/DriveFeedforwardForce", traction);
 
     return applied;
   }
