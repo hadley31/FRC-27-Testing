@@ -12,7 +12,7 @@ import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.geometry.Translation3d;
 import org.wpilib.math.kinematics.ChassisVelocities;
 
-import first.lib.InterpolatingMeasureTreeMap;
+import first.lib.util.InterpolatingMeasureTreeMap;
 
 /**
  * Exercises the shoot-on-the-move solution in {@link ShotCalculationUtil}.

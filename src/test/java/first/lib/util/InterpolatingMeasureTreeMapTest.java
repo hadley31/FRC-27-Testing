@@ -1,4 +1,4 @@
-package first.lib;
+package first.lib.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -6,6 +6,8 @@ import static org.wpilib.units.Units.Degrees;
 import static org.wpilib.units.Units.Feet;
 
 import org.junit.jupiter.api.Test;
+
+import first.lib.util.InterpolatingMeasureTreeMap;
 
 /**
  * Pins the parts of {@link InterpolatingMeasureTreeMap} that a live-tuned table depends on.

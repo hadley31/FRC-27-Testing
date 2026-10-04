@@ -4,7 +4,7 @@ import static org.wpilib.units.Units.RPM;
 
 import org.wpilib.units.measure.AngularVelocity;
 
-import first.lib.mechanism.TuningState;
+import first.lib.tuning.TuningState;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanism;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismInputsAutoLogged;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismIO;

@@ -17,7 +17,7 @@ import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.geometry.Translation2d;
 import org.wpilib.math.kinematics.ChassisVelocities;
 
-import first.lib.mechanism.TunableGains;
+import first.lib.tuning.TunableGains;
 import first.lib.mechanism.angle.AngleMechanismIO;
 import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismIO;

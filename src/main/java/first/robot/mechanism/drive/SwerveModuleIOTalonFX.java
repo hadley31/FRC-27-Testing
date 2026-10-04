@@ -38,7 +38,7 @@ import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
 import com.ctre.phoenix6.swerve.SwerveModuleConstants;
 
-import first.lib.mechanism.PhoenixUtil;
+import first.lib.util.PhoenixUtil;
 
 /**
  * A module driven by two Talon FXs with a CANcoder on the azimuth, configured from the constants

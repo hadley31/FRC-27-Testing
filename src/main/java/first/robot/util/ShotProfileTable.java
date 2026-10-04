@@ -21,7 +21,7 @@ import org.wpilib.units.measure.AngularVelocity;
 import org.wpilib.units.measure.Distance;
 import org.wpilib.units.measure.Time;
 
-import first.lib.InterpolatingMeasureTreeMap;
+import first.lib.util.InterpolatingMeasureTreeMap;
 
 /**
  * A shot table as rows rather than as three independent curves: one range, and everything the shooter

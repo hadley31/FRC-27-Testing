@@ -1,4 +1,4 @@
-package first.lib;
+package first.lib.util;
 
 import static org.wpilib.units.Units.Meters;
 import static org.wpilib.units.Units.Radians;

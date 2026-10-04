@@ -4,7 +4,7 @@ import static org.wpilib.units.Units.Degrees;
 
 import org.wpilib.units.measure.Angle;
 
-import first.lib.mechanism.TuningState;
+import first.lib.tuning.TuningState;
 import first.lib.mechanism.angle.AngleMechanism;
 import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 import first.lib.mechanism.angle.AngleMechanismIO;

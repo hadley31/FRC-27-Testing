@@ -16,7 +16,7 @@ import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.Pigeon2Configuration;
 import com.ctre.phoenix6.hardware.Pigeon2;
 
-import first.lib.mechanism.PhoenixUtil;
+import first.lib.util.PhoenixUtil;
 
 public class GyroIOPigeon2 implements GyroIO {
   private static final double kConnectedDebounceSeconds = 0.1;

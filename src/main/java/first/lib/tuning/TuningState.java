@@ -1,4 +1,4 @@
-package first.lib.mechanism;
+package first.lib.tuning;
 
 import java.util.function.DoubleFunction;
 

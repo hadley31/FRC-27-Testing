@@ -1,5 +1,7 @@
 package first.lib.mechanism;
 
+import first.lib.tuning.TunableGains;
+
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 /**

@@ -1,4 +1,4 @@
-package first.robot.mechanism.vision;
+package first.robot.mechanism.vision.apriltag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,12 +17,6 @@ import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.geometry.Transform3d;
 import org.wpilib.math.geometry.Translation2d;
 
-import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIOInputsAutoLogged;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIOPhotonVision;
-import first.robot.mechanism.vision.apriltag.PhotonAprilTagVisionSim;
-import first.robot.mechanism.vision.apriltag.RobotHeadingSource;
 
 /**
  * Covers the single-tag path, which is the one that needs something from outside the camera.

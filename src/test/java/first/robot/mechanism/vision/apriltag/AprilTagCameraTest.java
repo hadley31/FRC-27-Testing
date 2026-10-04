@@ -1,4 +1,4 @@
-package first.robot.mechanism.vision;
+package first.robot.mechanism.vision.apriltag;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,12 +15,6 @@ import org.wpilib.math.geometry.Transform3d;
 import org.wpilib.math.geometry.Translation3d;
 import org.wpilib.units.measure.Time;
 
-import first.robot.mechanism.vision.apriltag.AprilTagCamera;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIOInputsAutoLogged;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
-import first.robot.mechanism.vision.apriltag.AprilTagPoseObservation;
-import first.robot.mechanism.vision.apriltag.AprilTagVision;
 
 /**
  * Covers the part of the multi-estimate path that only breaks at runtime: one estimate is spread

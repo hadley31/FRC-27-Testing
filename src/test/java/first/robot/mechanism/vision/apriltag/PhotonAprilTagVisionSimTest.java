@@ -1,4 +1,4 @@
-package first.robot.mechanism.vision;
+package first.robot.mechanism.vision.apriltag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -18,11 +18,6 @@ import org.wpilib.math.geometry.Transform2d;
 import org.wpilib.math.geometry.Transform3d;
 import org.wpilib.math.geometry.Translation2d;
 
-import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIOInputsAutoLogged;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIOPhotonVision;
-import first.robot.mechanism.vision.apriltag.PhotonAprilTagVisionSim;
 
 /**
  * Drives the simulated camera end to end: place the robot somewhere it can see a tag, render the

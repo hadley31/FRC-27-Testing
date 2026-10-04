@@ -1,5 +1,7 @@
 package first.lib.mechanism;
 
+import first.lib.tuning.TuningState;
+
 import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.inputs.LoggableInputs;

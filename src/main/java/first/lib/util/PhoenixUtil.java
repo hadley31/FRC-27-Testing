@@ -1,4 +1,4 @@
-package first.lib.mechanism;
+package first.lib.util;
 
 import java.util.function.Supplier;
 

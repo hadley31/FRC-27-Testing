@@ -8,7 +8,7 @@ import org.wpilib.units.measure.AngularVelocity;
 import org.wpilib.units.measure.Distance;
 import org.wpilib.units.measure.Time;
 
-import first.lib.InterpolatingMeasureTreeMap;
+import first.lib.util.InterpolatingMeasureTreeMap;
 
 /**
  * The empirical tuning for one way of shooting: how long fuel is in the air at a given range, and

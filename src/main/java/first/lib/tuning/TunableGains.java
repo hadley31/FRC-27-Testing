@@ -1,4 +1,4 @@
-package first.lib.mechanism;
+package first.lib.tuning;
 
 import org.wpilib.tunable.TunableDouble;
 import org.wpilib.tunable.Tunables;

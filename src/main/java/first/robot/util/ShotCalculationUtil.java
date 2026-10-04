@@ -15,7 +15,7 @@ import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.Distance;
 import org.wpilib.units.measure.Time;
 
-import first.lib.InterpolatingMeasureTreeMap;
+import first.lib.util.InterpolatingMeasureTreeMap;
 
 /**
  * Solves for the turret angle, hood angle and flywheel speed that put fuel in a target, accounting

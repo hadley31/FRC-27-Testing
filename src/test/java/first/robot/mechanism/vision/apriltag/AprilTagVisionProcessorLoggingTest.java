@@ -1,4 +1,4 @@
-package first.robot.mechanism.vision;
+package first.robot.mechanism.vision.apriltag;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,9 +25,6 @@ import org.wpilib.math.geometry.Translation3d;
 import org.wpilib.math.kinematics.ChassisVelocities;
 import org.wpilib.system.RobotController;
 
-import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
-import first.robot.mechanism.vision.apriltag.AprilTagPoseObservation;
-import first.robot.mechanism.vision.apriltag.AprilTagVisionProcessor;
 import first.robot.util.PoseEstimator.VisionObservation;
 
 /**

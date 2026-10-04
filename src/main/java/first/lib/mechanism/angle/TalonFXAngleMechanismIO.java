@@ -10,8 +10,8 @@ import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.controls.PositionTorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.TalonFX;
 
-import first.lib.mechanism.PhoenixUtil;
-import first.lib.mechanism.TunableGains;
+import first.lib.util.PhoenixUtil;
+import first.lib.tuning.TunableGains;
 
 public class TalonFXAngleMechanismIO implements AngleMechanismIO {
   private final TalonFX m_motor;
