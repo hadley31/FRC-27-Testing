@@ -28,7 +28,6 @@ import org.wpilib.math.kinematics.ChassisVelocities;
 import org.wpilib.math.linalg.VecBuilder;
 import org.wpilib.math.linalg.Vector;
 import org.wpilib.math.numbers.N3;
-import org.wpilib.system.RobotController;
 import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.Distance;
 import org.wpilib.units.measure.Time;
@@ -393,7 +392,6 @@ public class AprilTagVisionProcessor {
 
     return sigmaBearing / Math.max(geometry.tagSpreadMeters(), MIN_TAG_SPREAD.in(Meters));
   }
-
 
   private void submitAcceptedObservation(Accepted acceptedResult) {
     VisionObservation visionObservation = new VisionObservation(
