@@ -8,7 +8,7 @@ import org.wpilib.math.geometry.Transform3d;
  * <p>These two values are everything that distinguishes one camera from another and that is true in
  * every robot mode: the real camera, its simulated stand-in and its replay placeholder all describe
  * the same camera in the same place. Separating them from the IO is what lets the cameras be
- * declared once, as data, and lets an {@link AprilTagCameraIOFactory} decide per mode what to build
+ * declared once, as data, and lets an {@link AprilTagVisionFactory} decide per mode what to build
  * from each declaration.
  *
  * @param name          the camera's name, which must match the name the coprocessor publishes under

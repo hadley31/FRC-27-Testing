@@ -10,15 +10,24 @@ import java.util.stream.Collectors;
 import first.lib.mechanism.LoggedComponent;
 
 public class AprilTagCamera implements LoggedComponent<AprilTagCameraIO, AprilTagCameraIOInputsAutoLogged> {
+  private final AprilTagCameraConfig m_config;
   private final String m_name;
   private final String m_logName;
   private final AprilTagCameraIO m_io;
   private final AprilTagCameraIOInputsAutoLogged m_inputs;
 
-  public AprilTagCamera(AprilTagCameraIO io) {
+  /**
+   * @param config the camera as declared, which is what its observations are attributed to. Taken
+   *               here rather than read back off {@code io} because where a camera sits and what it
+   *               is called are declaration data: the IO was built from this same config, so asking
+   *               it would only be a round trip through a device that cannot know better.
+   * @param io     how to read the camera
+   */
+  public AprilTagCamera(AprilTagCameraConfig config, AprilTagCameraIO io) {
+    m_config = config;
     m_io = io;
     m_inputs = new AprilTagCameraIOInputsAutoLogged();
-    m_name = io.getName();
+    m_name = config.name();
     m_logName = "Camera/" + m_name;
   }
 
@@ -56,7 +65,7 @@ public class AprilTagCamera implements LoggedComponent<AprilTagCameraIO, AprilTa
 
     for (int i = 0; i < count; i++) {
       observations.add(new AprilTagPoseObservation(
-          m_io,
+          m_config,
           m_inputs.observedRobotPoses[i],
           Seconds.of(m_inputs.timestampsSeconds[i]),
           Arrays.stream(m_inputs.tagIds[i]).boxed().collect(Collectors.toUnmodifiableSet()),

@@ -1,38 +1,15 @@
 package first.robot.mechanism.vision.apriltag;
 
-import org.wpilib.math.geometry.Transform3d;
-
 /**
- * A camera that reads nothing, for replay, where the log supplies the inputs and the IO layer is
- * only there to be named.
+ * A camera that reads nothing, for replay, where the log supplies every input.
+ *
+ * <p>Nothing to hold and nothing to do. What the camera is called and where it sits come from its
+ * {@link AprilTagCameraConfig}, which {@link AprilTagCamera} already has, and everything the log
+ * recorded arrives through the inputs object; so a replay IO is the absence of an IO, spelled out.
  */
 public class AprilTagCameraIOReplay implements AprilTagCameraIO {
-  private final String m_cameraName;
-  private final Transform3d m_robotToCamera;
-
-  /**
-   * @param config the camera being replayed. Its name selects which camera's recorded inputs these
-   *               become, so it must match the name the log was written under; its mounting
-   *               transform is carried through unchanged, since where the camera sat is a property
-   *               of the robot rather than something the log recorded.
-   */
-  public AprilTagCameraIOReplay(AprilTagCameraConfig config) {
-    m_cameraName = config.name();
-    m_robotToCamera = config.robotToCamera();
-  }
-
   @Override
   public void updateInputs(AprilTagCameraIOInputsAutoLogged inputs) {
-  }
-
-  @Override
-  public String getName() {
-    return m_cameraName;
-  }
-
-  @Override
-  public Transform3d getRobotToCamera() {
-    return m_robotToCamera;
   }
 
   @Override

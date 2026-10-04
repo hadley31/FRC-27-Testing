@@ -174,12 +174,12 @@ public class RobotState {
   public void resetPose(Pose2d pose) {
     m_poseEstimator.resetPose(m_drive.getRawGyroAngle(), m_drive.getModulePositions(), pose);
 
-    // The simulated cameras are rendered from the odometry pose this just teleported, and the
-    // simulation keeps its own history of that pose which the teleport does not reach. Unless it is
-    // told, it renders the next frame or two from somewhere between the old pose and the new one --
-    // stamped after the reset, so the filter cannot recognise them as stale and undoes the reset on
-    // the strength of them. A no-op on a real robot.
-    m_vision.onPoseReset(pose);
+    // A simulated field is rendered from the pose just teleported, and keeps a trail of recent poses
+    // to render camera latency from that the teleport does not reach. Unless it is told, it spends
+    // the next frame or two rendering the robot part way back to where it came from -- stamped after
+    // the reset, so the filter cannot recognise those frames as stale and undoes the reset on the
+    // strength of them. A no-op on a real robot.
+    m_vision.resetRobotPose(pose);
   }
 
   /** The robot pose projected forward by {@code seconds} of its current motion. */

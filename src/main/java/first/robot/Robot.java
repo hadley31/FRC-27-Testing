@@ -6,6 +6,8 @@ package first.robot;
 
 import static first.robot.util.Constants.ElectricalConstants.CAN_BUS;
 
+import java.util.function.Supplier;
+
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -16,6 +18,7 @@ import org.wpilib.command3.Scheduler;
 import org.wpilib.command3.button.RobotModeTriggers;
 import org.wpilib.fields.Field;
 import org.wpilib.fields.Fields;
+import org.wpilib.math.geometry.Pose2d;
 
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
@@ -36,8 +39,12 @@ import first.robot.mechanism.feeder.Feeder;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
+import first.robot.mechanism.vision.apriltag.AprilTagCameraIOReplay;
 import first.robot.mechanism.vision.apriltag.AprilTagVision;
 import first.robot.mechanism.vision.apriltag.AprilTagVisionFactory;
+import first.robot.mechanism.vision.apriltag.AprilTagVisionFactoryPhotonVision;
+import first.robot.mechanism.vision.apriltag.AprilTagVisionFactoryPhotonVisionSim;
+import first.robot.mechanism.vision.apriltag.RobotHeadingSource;
 import first.robot.mode.CompetitionAutoFactory;
 import first.robot.mode.CompetitionTeleopFactory;
 import first.robot.util.Constants;
@@ -92,12 +99,11 @@ public class Robot extends LoggedRobot {
     // leaves heading to the multi-tag solves that can actually measure it. The simulated cameras,
     // on the other hand, must be posed from odometry, because rendering sightings from the
     // vision-corrected pose would only ever confirm the correction they were rendered from.
-    vision = AprilTagVisionFactory.create(
-        Constants.RobotModeConstants.CURRENT_MODE,
+    vision = createVisionFactory(
         field,
-        VisionConstants.kCameras,
         () -> poseEstimator.getEstimatedPose().getRotation(),
-        poseEstimator::getOdometryPose);
+        poseEstimator::getOdometryPose)
+        .createVision(VisionConstants.kCameras);
 
     state = new RobotState(drive, turret, hood, flywheel, vision, poseEstimator, field);
 
@@ -110,6 +116,35 @@ public class Robot extends LoggedRobot {
 
     Scheduler.getDefault().addPeriodic(Toggle::logNonDefaults);
     Scheduler.getDefault().addPeriodic(state::periodic);
+  }
+
+  /**
+   * How AprilTag cameras are read in the current mode.
+   *
+   * <p>Each mode names its own factory, and they are free to disagree: a robot reading its cameras
+   * some other way would change only the {@code REAL} line and go on being simulated by
+   * PhotonVision's tooling. See {@link AprilTagVisionFactory}.
+   *
+   * @param field                   the tag layout the cameras solve against, and in simulation the
+   *                                layout that gets rendered
+   * @param headingSource           the robot heading single-tag solves need
+   * @param groundTruthPoseSupplier where the robot really is, used only in simulation
+   */
+  private static AprilTagVisionFactory createVisionFactory(
+      Field field,
+      RobotHeadingSource headingSource,
+      Supplier<Pose2d> groundTruthPoseSupplier) {
+    return switch (Constants.RobotModeConstants.CURRENT_MODE) {
+      case REAL -> new AprilTagVisionFactoryPhotonVision(field, headingSource);
+
+      case SIM -> new AprilTagVisionFactoryPhotonVisionSim(
+          field, headingSource, groundTruthPoseSupplier);
+
+      // Replay reads nothing, since the log supplies the inputs, and must not construct a real
+      // camera: that would open NetworkTables subscriptions and run a coprocessor version check for
+      // values that are about to be overwritten from the log.
+      case REPLAY -> config -> new AprilTagCameraIOReplay();
+    };
   }
 
   /** The gyro for the current mode. Simulation runs without one and lets odometry infer heading. */

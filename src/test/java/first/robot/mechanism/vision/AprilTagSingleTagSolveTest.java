@@ -21,7 +21,7 @@ import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
 import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
 import first.robot.mechanism.vision.apriltag.AprilTagCameraIOInputsAutoLogged;
 import first.robot.mechanism.vision.apriltag.AprilTagCameraIOPhotonVision;
-import first.robot.mechanism.vision.apriltag.PhotonVisionSim;
+import first.robot.mechanism.vision.apriltag.PhotonAprilTagVisionSim;
 import first.robot.mechanism.vision.apriltag.RobotHeadingSource;
 
 /**
@@ -95,7 +95,7 @@ public class AprilTagSingleTagSolveTest {
    */
   private static AprilTagCameraIOInputsAutoLogged observe(
       String cameraName, Pose2d truePose, RobotHeadingSource headingSource) {
-    PhotonVisionSim visionSim = new PhotonVisionSim(FIELD);
+    PhotonAprilTagVisionSim visionSim = new PhotonAprilTagVisionSim(FIELD, () -> truePose);
     AprilTagCameraIO io = AprilTagCameraIOPhotonVision.simulated(
         new AprilTagCameraConfig(cameraName, ROBOT_TO_CAMERA), FIELD, headingSource, visionSim);
 
@@ -104,7 +104,7 @@ public class AprilTagSingleTagSolveTest {
     // The camera runs with latency and its results reach the IO over NetworkTables, so a frame is
     // not guaranteed to be readable on the first pass. Pump until one arrives.
     for (int i = 0; i < 60 && inputs.observedRobotPoses.length == 0; i++) {
-      visionSim.update(truePose);
+      visionSim.update();
       io.updateInputs(inputs);
     }
 

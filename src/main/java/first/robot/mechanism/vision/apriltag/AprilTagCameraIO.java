@@ -2,7 +2,6 @@ package first.robot.mechanism.vision.apriltag;
 
 import org.littletonrobotics.junction.AutoLog;
 import org.wpilib.math.geometry.Pose3d;
-import org.wpilib.math.geometry.Transform3d;
 
 import first.lib.mechanism.LoggedComponentIO;
 
@@ -78,18 +77,6 @@ public interface AprilTagCameraIO extends LoggedComponentIO<AprilTagCameraIOInpu
 
     public int pipelineId = -1;
   }
-
-  public String getName();
-
-  /**
-   * Where this camera sits relative to the robot origin.
-   *
-   * <p>A constant of the camera rather than logged data, so it is the same on the robot and in
-   * replay. {@link AprilTagVisionProcessor} needs it because tag range has to be measured from the
-   * lens: the error model squares that range, and at close quarters the camera's offset from the
-   * robot origin is a large fraction of it.
-   */
-  public Transform3d getRobotToCamera();
 
   public int getPipelineIndex();
 

@@ -23,8 +23,7 @@ import org.wpilib.math.geometry.Translation3d;
 import org.wpilib.math.kinematics.ChassisVelocities;
 import org.wpilib.system.RobotController;
 
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
-import first.robot.mechanism.vision.apriltag.AprilTagCameraIOInputsAutoLogged;
+import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
 import first.robot.mechanism.vision.apriltag.AprilTagPoseObservation;
 import first.robot.mechanism.vision.apriltag.AprilTagVisionProcessor;
 import first.robot.util.PoseEstimator.VisionObservation;
@@ -523,7 +522,7 @@ public class AprilTagVisionProcessorTest {
   @Test
   void everyObservationFromABacklogIsWeighedSeparately() {
     Field field = fieldWithTagsAt(new Translation3d(2.0, 0.0, 0.0));
-    FakeCameraIO cameraIO = new FakeCameraIO();
+    AprilTagCameraConfig cameraIO = FAKE_CAMERA;
 
     m_accepted.clear();
     processor(field).process(List.of(
@@ -542,7 +541,7 @@ public class AprilTagVisionProcessorTest {
   @Test
   void aBadFrameInABacklogDoesNotDiscardTheGoodOnes() {
     Field field = fieldWithTagsAt(new Translation3d(2.0, 0.0, 0.0));
-    FakeCameraIO cameraIO = new FakeCameraIO();
+    AprilTagCameraConfig cameraIO = FAKE_CAMERA;
 
     m_accepted.clear();
     processor(field).process(List.of(
@@ -595,7 +594,7 @@ public class AprilTagVisionProcessorTest {
       double reprojectionErrorPixels,
       double timestampSeconds) {
     return new AprilTagPoseObservation(
-        new FakeCameraIO(),
+        FAKE_CAMERA,
         robotPose,
         Seconds.of(timestampSeconds),
         tags,
@@ -622,7 +621,7 @@ public class AprilTagVisionProcessorTest {
   /** An observation of tag 1 whose camera measured it at {@code rangeMeters}. */
   private AprilTagPoseObservation measuring(double rangeMeters) {
     return new AprilTagPoseObservation(
-        new FakeCameraIO(),
+        FAKE_CAMERA,
         Pose3d.ZERO,
         Seconds.of(NOW_SECONDS),
         Set.of(1),
@@ -633,9 +632,9 @@ public class AprilTagVisionProcessorTest {
 
   /** An observation attributed to a particular camera, for the tests about backlogs. */
   private static AprilTagPoseObservation observationFrom(
-      AprilTagCameraIO cameraIO, Pose3d robotPose, Set<Integer> tags, double timestampSeconds) {
+      AprilTagCameraConfig camera, Pose3d robotPose, Set<Integer> tags, double timestampSeconds) {
     return new AprilTagPoseObservation(
-        cameraIO, robotPose, Seconds.of(timestampSeconds), tags, 0.0, -1.0, NO_MEASURED_RANGES);
+        camera, robotPose, Seconds.of(timestampSeconds), tags, 0.0, -1.0, NO_MEASURED_RANGES);
   }
 
   /** Tags at floor level on a wall ahead of the robot, numbered from one in the order given. */
@@ -659,28 +658,6 @@ public class AprilTagVisionProcessorTest {
    * spinning robot is worth measuring and that measuring range from the origin instead would be
    * visibly wrong.
    */
-  private static final class FakeCameraIO implements AprilTagCameraIO {
-    @Override
-    public void updateInputs(AprilTagCameraIOInputsAutoLogged inputs) {
-    }
-
-    @Override
-    public String getName() {
-      return "FakeCamera";
-    }
-
-    @Override
-    public Transform3d getRobotToCamera() {
-      return new Transform3d(new Translation3d(0.35, 0.0, 0.0), new Rotation3d());
-    }
-
-    @Override
-    public int getPipelineIndex() {
-      return 0;
-    }
-
-    @Override
-    public void setPipelineIndex(int pipelineId) {
-    }
-  }
+  private static final AprilTagCameraConfig FAKE_CAMERA = new AprilTagCameraConfig(
+      "FakeCamera", new Transform3d(new Translation3d(0.35, 0.0, 0.0), new Rotation3d()));
 }

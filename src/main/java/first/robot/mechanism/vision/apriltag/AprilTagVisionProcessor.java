@@ -17,9 +17,7 @@ import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.function.ToDoubleFunction;
 
-import org.littletonrobotics.junction.Logger;
 import org.wpilib.fields.Field;
 import org.wpilib.math.geometry.Pose3d;
 import org.wpilib.math.geometry.Rotation2d;
@@ -191,8 +189,16 @@ public class AprilTagVisionProcessor {
   private final BooleanSupplier m_singleTagEstimationEnabled;
   private final Consumer<VisionObservation> m_observationConsumer;
 
+  /**
+   * Where each loop's verdicts get published. Its own object because what this class decides and how
+   * that decision is presented change for unrelated reasons: a log key gets renamed or a new
+   * regressor gets published without the model moving, and the model gets retuned without the log
+   * changing shape.
+   */
+  private final AprilTagVisionLogger m_logger = new AprilTagVisionLogger();
+
   /** Every camera that has reported at least once, so that a silent one still gets logged. */
-  private final Set<AprilTagCameraIO> m_camerasSeen = new LinkedHashSet<>();
+  private final Set<AprilTagCameraConfig> m_camerasSeen = new LinkedHashSet<>();
 
   /**
    * @param field                   the tag layout to measure observations against, which must be the
@@ -230,7 +236,7 @@ public class AprilTagVisionProcessor {
    * happened to be written last.
    */
   public void process(List<AprilTagPoseObservation> observations) {
-    Map<AprilTagCameraIO, List<Evaluation>> byCamera = new LinkedHashMap<>();
+    Map<AprilTagCameraConfig, List<Evaluation>> byCamera = new LinkedHashMap<>();
 
     for (AprilTagPoseObservation observation : observations) {
       SolveGeometry geometry = SolveGeometry.of(m_field, observation);
@@ -240,7 +246,7 @@ public class AprilTagVisionProcessor {
         submitAcceptedObservation(accepted);
       }
 
-      byCamera.computeIfAbsent(observation.cameraIO(), cameraIO -> new ArrayList<>())
+      byCamera.computeIfAbsent(observation.camera(), camera -> new ArrayList<>())
           .add(new Evaluation(result, geometry));
     }
 
@@ -253,8 +259,8 @@ public class AprilTagVisionProcessor {
     //
     // Which cameras exist is learned from the observations rather than declared, since a camera that
     // has never reported since boot is already visible as a disconnected one in its own inputs.
-    for (AprilTagCameraIO cameraIO : m_camerasSeen) {
-      log(cameraIO, byCamera.getOrDefault(cameraIO, List.of()));
+    for (AprilTagCameraConfig camera : m_camerasSeen) {
+      m_logger.log(camera, byCamera.getOrDefault(camera, List.of()));
     }
   }
 
@@ -282,7 +288,7 @@ public class AprilTagVisionProcessor {
       return new ReprojectionErrorRejection(observation, observation.reprojectionErrorPixels());
     }
 
-    Time latency = latencyOf(observation);
+    Time latency = observation.latency();
     if (latency.gt(MAX_LATENCY)) {
       return new LatencyRejection(observation, latency);
     }
@@ -364,7 +370,7 @@ public class AprilTagVisionProcessor {
   private double motionStandardDeviation(AprilTagPoseObservation observation) {
     ChassisVelocities velocities = m_robotVelocitiesSupplier.get();
 
-    double cameraRadius = observation.cameraIO().getRobotToCamera()
+    double cameraRadius = observation.camera().robotToCamera()
         .getTranslation().toTranslation2d().getNorm();
     double cameraSpeed = Math.hypot(velocities.vx, velocities.vy) + Math.abs(velocities.omega) * cameraRadius;
 
@@ -388,9 +394,6 @@ public class AprilTagVisionProcessor {
     return sigmaBearing / Math.max(geometry.tagSpreadMeters(), MIN_TAG_SPREAD.in(Meters));
   }
 
-  private static Time latencyOf(AprilTagPoseObservation observation) {
-    return RobotController.getMeasureTime().minus(observation.timestamp());
-  }
 
   private void submitAcceptedObservation(Accepted acceptedResult) {
     VisionObservation visionObservation = new VisionObservation(
@@ -401,146 +404,10 @@ public class AprilTagVisionProcessor {
   }
 
   /**
-   * Publishes one camera's work for this loop: how much of it there was, where it put the robot, and
-   * one observation in full.
-   *
-   * <p>Only the newest one, because a camera delivering several frames in a loop is rare enough that
-   * detailing all of them would cost more than it returns. Arrays would make every number here an indexed
-   * child whose length changes from loop to loop, which is awkward to graph and worse to read at a
-   * glance, and that cost would be paid on every loop to serve the few percent that carry a backlog.
-   * The counts above are what keep the thinning honest: a backlog is always visible as one, even
-   * though only one of its frames is described, so a model fitted from this log can never be fitted
-   * from a silently truncated sample.
-   *
-   * <p>The poses stay arrays regardless. That is the type a field view wants, and an empty one draws
-   * nothing, which is the right rendering for a camera that saw nothing and is not a thing a single
-   * pose can express. Every pose is published, accepted or not, since a backlog's poses are cheap
-   * and seeing where a rejected solve thought the robot was is most of working out why it was wrong.
-   */
-  private void log(AprilTagCameraIO cameraIO, List<Evaluation> evaluations) {
-    String prefix = "Vision/%s".formatted(cameraIO.getName());
-
-    Logger.recordOutput(prefix + "/ObservationCount", evaluations.size());
-    Logger.recordOutput(
-        prefix + "/AcceptedCount",
-        (int) evaluations.stream().filter(evaluation -> evaluation.result().accepted()).count());
-
-    Logger.recordOutput(
-        prefix + "/RejectedRobotPoses",
-        evaluations.stream()
-            .filter(evaluation -> !evaluation.result().accepted())
-            .map(evaluation -> evaluation.observation().observedRobotPose())
-            .toArray(Pose3d[]::new));
-
-    // Split by verdict rather than published as one array, so a field view can draw the two apart:
-    // the accepted poses are what moved the estimate, and the rejected ones are only worth seeing to
-    // work out why they were not.
-    Logger.recordOutput(
-        prefix + "/AcceptedRobotPoses",
-        evaluations.stream()
-            .filter(evaluation -> evaluation.result().accepted())
-            .map(evaluation -> evaluation.observation().observedRobotPose())
-            .toArray(Pose3d[]::new));
-
-    logMostRecent(
-        prefix + "/MostRecent",
-        // The newest frame, with no preference for whether it was accepted. Choosing the accepted
-        // one in a mixed loop would read better in that rare case, but it would also skew the
-        // described frames toward accepted ones, and these keys are the sample the error model gets
-        // fitted from. The counts above already carry the verdict for the loop as a whole, so
-        // nothing is lost by letting this one be an unbiased draw.
-        evaluations.isEmpty() ? Optional.empty() : Optional.of(evaluations.getLast()));
-  }
-
-  /**
-   * Describes one observation, or describes the absence of one.
-   *
-   * <p>This is the newest frame of the loop, not necessarily the one the estimator acted on: on a
-   * loop where one frame was accepted and a later one rejected, {@code Accepted} here reads false
-   * while the estimate was in fact corrected. {@code AcceptedCount} is the field that answers
-   * whether this camera contributed, and these describe one frame rather than the loop.
-   *
-   * <p>A camera that reported nothing writes here too, rather than leaving the keys alone. An
-   * unwritten key keeps whatever it last held, so skipping a silent camera would make one that has
-   * gone blind indistinguishable from one still watching the tag it saw a minute ago -- and a camera
-   * dropping out is the failure this log most needs to show. NaN is what it writes, because NaN does
-   * not plot, which is the honest rendering of a measurement that was never taken.
-   */
-  private void logMostRecent(String prefix, Optional<Evaluation> latestEvaluation) {
-    Logger.recordOutput(
-        prefix + "/Accepted",
-        latestEvaluation.map(evaluation -> evaluation.result().accepted()).orElse(false));
-    Logger.recordOutput(prefix + "/RejectionReason", latestEvaluation.map(Evaluation::reason).orElse(""));
-    Logger.recordOutput(
-        prefix + "/LatencySeconds",
-        scalarOf(latestEvaluation, evaluation -> latencyOf(evaluation.observation()).in(Seconds)));
-
-    Logger.recordOutput(prefix + "/StdDevs/X", scalarOf(latestEvaluation, evaluation -> evaluation.stdDev(0)));
-    Logger.recordOutput(prefix + "/StdDevs/Y", scalarOf(latestEvaluation, evaluation -> evaluation.stdDev(1)));
-    Logger.recordOutput(prefix + "/StdDevs/Theta", scalarOf(latestEvaluation, evaluation -> evaluation.stdDev(2)));
-
-    // The regressors the coefficients in this class are fit against. Logged for a rejected
-    // observation as readily as an accepted one: a log of only what survived would be a sample
-    // biased against exactly the geometry the model is least sure about.
-    Logger.recordOutput(
-        prefix + "/TagCount",
-        latestEvaluation.map(evaluation -> evaluation.geometry().tagCount()).orElse(-1));
-
-    // Where the tags the newest frame was solved from actually are, so a field view can draw them
-    // beside the pose they produced. Which is most of reading a bad frame: a solve pulled off to one
-    // side is one thing when the tag it came from is the far one of a pair and another when it is the
-    // tag a metre ahead, and the count alone cannot tell those apart.
-    //
-    // These are the layout's poses, not the camera's, and only for tags the layout recognised. So a
-    // frame that claimed more tags than appear here is one whose camera is solving against a
-    // different field, which is visible as the array being shorter than the solve's tag list.
-    Logger.recordOutput(
-        prefix + "/TagPoses",
-        latestEvaluation
-            .map(evaluation -> evaluation.geometry().tagPoses().toArray(Pose3d[]::new))
-            .orElseGet(() -> new Pose3d[0]));
-    Logger.recordOutput(
-        prefix + "/RangeDistance",
-        scalarOf(latestEvaluation, evaluation -> evaluation.geometry().rangeDistanceMeters()));
-    Logger.recordOutput(
-        prefix + "/BearingDistance",
-        scalarOf(latestEvaluation, evaluation -> evaluation.geometry().bearingDistanceMeters()));
-    Logger.recordOutput(
-        prefix + "/NearestTagDistance",
-        scalarOf(latestEvaluation, evaluation -> evaluation.geometry().nearestRangeMeters()));
-    Logger.recordOutput(
-        prefix + "/IncidenceCosine",
-        scalarOf(latestEvaluation, evaluation -> evaluation.geometry().incidenceCosine()));
-    Logger.recordOutput(
-        prefix + "/TagSpread",
-        scalarOf(latestEvaluation, evaluation -> evaluation.geometry().tagSpreadMeters()));
-    Logger.recordOutput(
-        prefix + "/TagBearingRadians",
-        scalarOf(latestEvaluation, evaluation -> evaluation.geometry().tagBearing().getRadians()));
-    Logger.recordOutput(
-        prefix + "/HeightError",
-        scalarOf(latestEvaluation, evaluation -> evaluation.geometry().heightErrorMeters()));
-    Logger.recordOutput(
-        prefix + "/TiltError",
-        scalarOf(latestEvaluation, evaluation -> evaluation.geometry().tiltErrorRadians()));
-    Logger.recordOutput(
-        prefix + "/Ambiguity",
-        scalarOf(latestEvaluation, evaluation -> evaluation.observation().ambiguity()));
-    Logger.recordOutput(
-        prefix + "/ReprojectionErrorPixels",
-        scalarOf(latestEvaluation, evaluation -> evaluation.observation().reprojectionErrorPixels()));
-  }
-
-  private static double scalarOf(
-      Optional<Evaluation> representative, ToDoubleFunction<Evaluation> field) {
-    return representative.isPresent() ? field.applyAsDouble(representative.get()) : Double.NaN;
-  }
-
-  /**
    * One observation's verdict together with the geometry it was reached from, held only long enough
    * for its camera's loop to be logged.
    */
-  private record Evaluation(Result result, SolveGeometry geometry) {
+  record Evaluation(Result result, SolveGeometry geometry) {
     AprilTagPoseObservation observation() {
       return result.observation();
     }
@@ -583,7 +450,7 @@ public class AprilTagVisionProcessor {
    * @param heightErrorMeters    how far above the floor the solve put the robot
    * @param tiltErrorRadians     how far from level the solve put the robot
    */
-  private record SolveGeometry(
+  record SolveGeometry(
       List<Pose3d> tagPoses,
       double nearestRangeMeters,
       double rangeDistanceMeters,
@@ -604,7 +471,7 @@ public class AprilTagVisionProcessor {
       // Where the lens is, for the fallback ranges below and for how square-on the tags were. Both
       // want the lens rather than the robot origin: the model squares a range, and at close quarters
       // the camera's offset is a large fraction of one.
-      Pose3d cameraPose = robotPose.plus(observation.cameraIO().getRobotToCamera());
+      Pose3d cameraPose = robotPose.plus(observation.camera().robotToCamera());
 
       Rotation3d rotation = robotPose.getRotation();
       double heightError = Math.abs(robotPose.getZ());

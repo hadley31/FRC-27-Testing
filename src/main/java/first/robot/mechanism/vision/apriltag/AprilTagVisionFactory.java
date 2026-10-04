@@ -1,106 +1,63 @@
 package first.robot.mechanism.vision.apriltag;
 
 import java.util.List;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-
-import org.wpilib.command3.Scheduler;
-import org.wpilib.fields.Field;
-import org.wpilib.math.geometry.Pose2d;
-
-import first.robot.util.Constants.RobotModeConstants.Mode;
+import java.util.Optional;
 
 /**
- * Builds the {@link AprilTagVision} mechanism for a robot mode.
+ * One way of reading AprilTag cameras, and the seam a vendor is swapped at.
  *
- * <p>This is the one place that knows a mode exists. Every difference between running on a robot,
- * running in simulation and replaying a log lives in the switch below: which IO each declared camera
- * gets, and whether there is a simulated field to render. Above this class the cameras are the same
- * cameras, and below it each IO knows only how to read the thing it was handed.
+ * <p>What varies between a real robot, a simulation and a log replay is only how a camera is read —
+ * never which cameras exist or where they are mounted. Those are declared once as
+ * {@link AprilTagCameraConfig}s, and an implementation of this turns every declaration into the IO
+ * that reads it. Nothing above the IO layer branches on the mode, and a test can supply cameras of
+ * its own by passing a factory rather than by pretending to be a mode.
+ *
+ * <p>An implementation holds whatever its vendor needs and nothing else: a tag layout, a heading
+ * source, a simulated field. Everything PhotonVision-specific lives in
+ * {@link AprilTagVisionFactoryPhotonVision} and {@link AprilTagVisionFactoryPhotonVisionSim}, so
+ * reading cameras some other way means writing one more implementation of this and nothing else.
+ *
+ * <h2>Mixing vendors across modes</h2>
+ *
+ * <p>Each mode picks its factory independently — see {@code Robot.createVisionFactory} — so the
+ * robot and the simulation need not read cameras the same way. A robot on Limelights can still be
+ * simulated with PhotonVision's tooling by choosing a Limelight factory for {@code REAL} and
+ * {@link AprilTagVisionFactoryPhotonVisionSim} for {@code SIM}. That pairing is not a compromise but
+ * the only thing that can work: a simulated PhotonVision camera publishes to PhotonVision's
+ * NetworkTables topics, so the IO reading a simulated field has to belong to whatever rendered it.
  */
-public final class AprilTagVisionFactory {
-  private AprilTagVisionFactory() {
-    throw new UnsupportedOperationException("This is a utility class!");
+@FunctionalInterface
+public interface AprilTagVisionFactory {
+  /**
+   * Returns the IO to read {@code config}'s camera through.
+   *
+   * @param config the camera to build for
+   */
+  public AprilTagCameraIO createCameraIO(AprilTagCameraConfig config);
+
+  /**
+   * The simulated field this factory's cameras are looking at, if this robot code is rendering one.
+   *
+   * <p>Empty for a real robot, where what a camera sees is the world and nothing has to put it
+   * there. Simulation needs it for two reasons that travel together: the field has to be rendered
+   * before the cameras look at it each loop, and it has to be told when the robot's pose is reset.
+   * {@link AprilTagVision} owns both, which is why this returns the field rather than just the work
+   * of rendering it.
+   */
+  default Optional<AprilTagVisionSim> createSim() {
+    return Optional.empty();
   }
 
   /**
-   * Returns a vision mechanism with one camera per declaration, read the way {@code mode} requires.
+   * Returns the vision mechanism for a robot with these cameras, one IO per declaration.
    *
-   * @param mode                     the mode the robot code is running in
-   * @param field                    the tag layout the cameras solve against, and in simulation the
-   *                                 layout that gets rendered
-   * @param cameras                  the cameras on the robot
-   * @param headingSource            the robot heading single-tag solves need; see
-   *                                 {@link RobotHeadingSource} for what it must be
-   * @param groundTruthPoseSupplier  where the robot really is, used only in simulation and only to
-   *                                 render what the cameras see. This must be a pose no vision
-   *                                 observation has corrected; see {@link PhotonVisionSim#update}.
+   * @param cameras the cameras on the robot
    */
-  public static AprilTagVision create(
-      Mode mode,
-      Field field,
-      List<AprilTagCameraConfig> cameras,
-      RobotHeadingSource headingSource,
-      Supplier<Pose2d> groundTruthPoseSupplier) {
-    Wiring wiring = wiringFor(mode, field, headingSource, groundTruthPoseSupplier);
-
+  default AprilTagVision createVision(List<AprilTagCameraConfig> cameras) {
     return new AprilTagVision(
-        wiring.onPoseReset(),
-        cameras.stream().map(wiring.ioFactory()::create).toArray(AprilTagCameraIO[]::new));
-  }
-
-  /**
-   * What a mode needs wired up: how to build its cameras, and what a pose reset has to tell.
-   *
-   * @param ioFactory   turns one camera declaration into the IO that reads it
-   * @param onPoseReset what to notify when the pose estimate is teleported, which is nothing outside
-   *                    simulation; see {@link AprilTagVision#onPoseReset}
-   */
-  private record Wiring(AprilTagCameraIOFactory ioFactory, Consumer<Pose2d> onPoseReset) {
-  }
-
-  /**
-   * The strategy for building camera IOs in {@code mode}.
-   *
-   * <p>Simulation shares the real robot's IO rather than getting one of its own, because there is
-   * nothing for a second IO to implement: PhotonVision simulates the camera, not the reading of it,
-   * so a simulated camera publishes to the same NetworkTables topics a coprocessor would and the IO
-   * reads them with the same code. Only the construction differs. Replay reads nothing, since the
-   * log supplies the inputs, and must not construct a real camera: that would open NetworkTables
-   * subscriptions and run a coprocessor version check for values that are about to be overwritten
-   * from the log.
-   */
-  private static Wiring wiringFor(
-      Mode mode,
-      Field field,
-      RobotHeadingSource headingSource,
-      Supplier<Pose2d> simGroundTruthPoseSupplier) {
-    return switch (mode) {
-      case REAL -> new Wiring(
-          config -> new AprilTagCameraIOPhotonVision(config, field, headingSource),
-          // Moving the estimate does not move a real robot, and its cameras go on reporting where it
-          // really is. There is nothing to tell.
-          pose -> {
-          });
-
-      case SIM -> {
-        PhotonVisionSim visionSim = new PhotonVisionSim(field);
-
-        // The simulated field has to be rendered before the cameras look at it, and the scheduler
-        // runs periodics in registration order. Registering here rather than in Robot is what makes
-        // that ordering structural: this runs while the factory is being chosen, so it cannot help
-        // but come before the AprilTagVision that is built from the factory's cameras.
-        Scheduler.getDefault().addPeriodic(() -> visionSim.update(simGroundTruthPoseSupplier.get()));
-
-        yield new Wiring(
-            config -> AprilTagCameraIOPhotonVision.simulated(config, field, headingSource, visionSim),
-            visionSim::resetRobotPose);
-      }
-
-      // Replay renders nothing and reads nothing: the log supplies the inputs, including whatever
-      // the cameras saw around a reset the log already recorded.
-      case REPLAY -> new Wiring(AprilTagCameraIOReplay::new, pose -> {
-      });
-    };
+        cameras.stream()
+            .map(config -> new AprilTagCamera(config, createCameraIO(config)))
+            .toList(),
+        createSim());
   }
 }

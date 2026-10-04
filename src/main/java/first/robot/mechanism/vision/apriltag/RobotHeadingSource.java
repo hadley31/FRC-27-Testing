@@ -32,7 +32,7 @@ import org.wpilib.math.geometry.Rotation2d;
  * frames cannot themselves correct. Recovering from one takes a multi-tag sighting or a pose reset.
  *
  * <p>This is a separate question from what a simulated camera is posed from, which must be a pose
- * vision has never touched; see {@link PhotonVisionSim#update}.
+ * vision has never touched; see {@link AprilTagVisionSim#update}.
  */
 @FunctionalInterface
 public interface RobotHeadingSource {

@@ -5,6 +5,8 @@ import static org.wpilib.units.Units.Degrees;
 import static org.wpilib.units.Units.Meters;
 import static org.wpilib.units.Units.Seconds;
 
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.wpilib.driverstation.internal.DriverStationBackend;
@@ -140,7 +142,7 @@ class RobotStateTest {
 
     m_state = new RobotState(
         m_drive, m_turret, new Hood(new StubAngleIO()), new Flywheel(new StubVelocityIO()),
-        new AprilTagVision(), poseEstimator, Fields.DEFAULT_FIELD.loadField());
+        new AprilTagVision(List.of()), poseEstimator, Fields.DEFAULT_FIELD.loadField());
     return m_state;
   }
 

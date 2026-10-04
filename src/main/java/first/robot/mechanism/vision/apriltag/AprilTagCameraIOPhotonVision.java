@@ -19,7 +19,6 @@ import org.photonvision.targeting.PhotonTrackedTarget;
 import org.wpilib.fields.Field;
 import org.wpilib.math.geometry.Pose3d;
 import org.wpilib.math.geometry.Rotation2d;
-import org.wpilib.math.geometry.Transform3d;
 import org.wpilib.system.RobotController;
 
 public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
@@ -34,8 +33,6 @@ public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
    */
   private static final double NOT_REPORTED = -1.0;
 
-  private final String m_cameraName;
-  private final Transform3d m_robotToCamera;
   private final PhotonCamera m_camera;
   private final PhotonPoseEstimator m_poseEstimator;
   private final RobotHeadingSource m_headingSource;
@@ -47,8 +44,6 @@ public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
    */
   public AprilTagCameraIOPhotonVision(
       AprilTagCameraConfig config, Field field, RobotHeadingSource headingSource) {
-    m_cameraName = config.name();
-    m_robotToCamera = config.robotToCamera();
     m_camera = new PhotonCamera(config.name());
     m_poseEstimator = new PhotonPoseEstimator(field, config.robotToCamera());
     m_headingSource = headingSource;
@@ -69,7 +64,7 @@ public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
       AprilTagCameraConfig config,
       Field field,
       RobotHeadingSource headingSource,
-      PhotonVisionSim visionSim) {
+      PhotonAprilTagVisionSim visionSim) {
     AprilTagCameraIOPhotonVision io = new AprilTagCameraIOPhotonVision(config, field, headingSource);
     visionSim.addCamera(
         new PhotonCameraSim(io.m_camera, simulatedCameraProperties(), field), config.robotToCamera());
@@ -194,16 +189,6 @@ public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
 
   private static int[] tagIdsOf(EstimatedRobotPose estimate) {
     return estimate.targetsUsed.stream().mapToInt(PhotonTrackedTarget::getFiducialId).toArray();
-  }
-
-  @Override
-  public String getName() {
-    return m_cameraName;
-  }
-
-  @Override
-  public Transform3d getRobotToCamera() {
-    return m_robotToCamera;
   }
 
   @Override

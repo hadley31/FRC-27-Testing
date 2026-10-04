@@ -16,6 +16,7 @@ import org.wpilib.math.geometry.Translation3d;
 import org.wpilib.units.measure.Time;
 
 import first.robot.mechanism.vision.apriltag.AprilTagCamera;
+import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
 import first.robot.mechanism.vision.apriltag.AprilTagCameraIOInputsAutoLogged;
 import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
 import first.robot.mechanism.vision.apriltag.AprilTagPoseObservation;
@@ -59,16 +60,6 @@ public class AprilTagCameraTest {
     }
 
     @Override
-    public String getName() {
-      return "FakeCamera";
-    }
-
-    @Override
-    public Transform3d getRobotToCamera() {
-      return Transform3d.ZERO;
-    }
-
-    @Override
     public int getPipelineIndex() {
       return 0;
     }
@@ -83,6 +74,7 @@ public class AprilTagCameraTest {
       double[] ambiguities, double[] reprojectionErrorsPixels, int[][] tagIds,
       double[][] tagRangesMeters) {
     AprilTagCamera camera = new AprilTagCamera(
+        new AprilTagCameraConfig("FakeCamera", Transform3d.ZERO),
         new FakeCameraIO(timestampsSeconds, observedRobotPoses, ambiguities,
             reprojectionErrorsPixels, tagIds, tagRangesMeters));
     camera.getIO().updateInputs(camera.getInputs());
@@ -176,7 +168,7 @@ public class AprilTagCameraTest {
         new int[][] { { 1 } },
         new double[][] { { 2.5 } });
 
-    assertEquals("FakeCamera", camera.getObservations().get(0).cameraIO().getName());
+    assertEquals("FakeCamera", camera.getObservations().get(0).camera().name());
   }
 
   /**
