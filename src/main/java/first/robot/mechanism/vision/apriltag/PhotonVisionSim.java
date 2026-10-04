@@ -46,6 +46,25 @@ public class PhotonVisionSim {
   }
 
   /**
+   * Teleports the robot on the simulated field, discarding the pose history behind it.
+   *
+   * <p>This is not the same as calling {@link #update} with the new pose, and the difference is the
+   * whole reason this method exists. {@link VisionSystemSim} keeps its own buffer of where the robot
+   * has been, and renders each frame from the pose at that frame's capture time rather than from the
+   * pose it was last handed -- a frame read now was exposed tens of milliseconds ago, and simulating
+   * that is the point. A pose reset is a teleport that buffer knows nothing about, so without this it
+   * goes on interpolating across the jump and renders frames from poses somewhere between where the
+   * robot was and where it has just been declared to be. Those frames carry capture timestamps after
+   * the reset, so nothing downstream can tell them from honest ones: they are not stale, they are
+   * wrong.
+   *
+   * @param robotPose where the robot now is, with no history behind it
+   */
+  public void resetRobotPose(Pose2d robotPose) {
+    m_sim.resetRobotPose(robotPose);
+  }
+
+  /**
    * Places a simulated camera on the robot. Package-private because the only thing that should be
    * building a {@link PhotonCameraSim} is the PhotonVision IO layer, which owns the
    * {@code PhotonCamera} it has to wrap.

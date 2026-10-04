@@ -60,8 +60,12 @@ public class AprilTagVisionProcessorTest {
   /** Where the standard deviations bottom out, from the processor's systematic floor. */
   private static final double FLOOR_METERS = 0.025;
 
+  /** The flat inflation the processor charges a one-tag solve, on top of its geometry. */
+  private static final double SINGLE_TAG_SCALE = 2.5;
+
   private final List<VisionObservation> m_accepted = new ArrayList<>();
   private ChassisVelocities m_velocities = new ChassisVelocities();
+  private boolean m_singleTagEstimationEnabled = true;
 
   @BeforeEach
   void freezeTheClock() {
@@ -182,24 +186,53 @@ public class AprilTagVisionProcessorTest {
   /**
    * Two independent looks at the same thing halve the variance, so they divide the standard
    * deviation by root two -- not by ten, which is what a discrete multi-tag bonus amounts to.
+   *
+   * <p>{@link #SINGLE_TAG_SCALE} is divided back out, because that charge is deliberately not
+   * root-N: it prices what a lone tag lacks regardless of its range, and
+   * {@link #aLoneTagIsChargedBeyondWhatRootNExplains} is the test for it. What is being checked here
+   * is that the rest of the gap is the root two independent measurements earn, continuously, rather
+   * than a bonus awarded for crossing from one tag to two.
    */
   @Test
   void aSecondTagAtTheSameRangeImprovesErrorByRootTwo() {
     // Placed symmetrically about the axis to the robot, so the pair's bearing and incidence match
     // the lone tag's and the only thing that changes is how many there are.
-    double oneTag = submit(
-        fieldWithTagsAt(new Translation3d(6.0, 0.0, 0.0)),
+    double oneTag = geometricPart(submit(
+        fieldWithTagsAt(new Translation3d(4.0, 0.0, 0.0)),
         observationAt(Pose3d.ZERO, Set.of(1)))
-        .stdDevs().get(0, 0);
+        .stdDevs().get(0, 0)) / SINGLE_TAG_SCALE;
 
-    double twoTags = submit(
-        fieldWithTagsAt(new Translation3d(6.0, -0.5, 0.0), new Translation3d(6.0, 0.5, 0.0)),
+    double twoTags = geometricPart(submit(
+        fieldWithTagsAt(new Translation3d(4.0, -0.3, 0.0), new Translation3d(4.0, 0.3, 0.0)),
         observationAt(Pose3d.ZERO, Set.of(1, 2)))
-        .stdDevs().get(0, 0);
+        .stdDevs().get(0, 0));
 
     assertEquals(1.0 / Math.sqrt(2.0), twoTags / oneTag, 0.05,
         "two tags should be worth root two, got %f from %f and %f"
             .formatted(twoTags / oneTag, oneTag, twoTags));
+  }
+
+  /**
+   * A lone tag is charged for more than being one sample of a d^2 error, because what it is missing
+   * is not distance. Nothing contradicts a misread corner or a tag matched to the wrong id, and the
+   * trig solve rests on the gyro heading, so the ways a one-tag frame goes badly wrong leave no
+   * trace in the geometry the model above can see. The pair here is the same two tags as the root-N
+   * test, so the gap this asserts is over and above the root two of that.
+   */
+  @Test
+  void aLoneTagIsChargedBeyondWhatRootNExplains() {
+    double oneTag = submit(
+        fieldWithTagsAt(new Translation3d(4.0, 0.0, 0.0)),
+        observationAt(Pose3d.ZERO, Set.of(1)))
+        .stdDevs().get(0, 0);
+
+    double twoTags = submit(
+        fieldWithTagsAt(new Translation3d(4.0, -0.3, 0.0), new Translation3d(4.0, 0.3, 0.0)),
+        observationAt(Pose3d.ZERO, Set.of(1, 2)))
+        .stdDevs().get(0, 0);
+
+    assertTrue(oneTag / twoTags > Math.sqrt(2.0) * 1.5,
+        "a one-tag frame should be distrusted well past root N: %f vs %f".formatted(oneTag, twoTags));
   }
 
   // MARK: - Quality signals
@@ -347,6 +380,25 @@ public class AprilTagVisionProcessorTest {
   }
 
   /**
+   * The gate is fifteen feet to the nearest tag, so a solve whose only tag is past that is refused
+   * rather than weighed. Out there the error stops being the smooth d^2 the coefficients describe --
+   * half a pixel of corner noise is a large fraction of a tag twenty pixels wide -- so a standard
+   * deviation is no longer an honest price for it.
+   */
+  @Test
+  void anObservationWhoseOnlyTagIsBeyondFifteenFeetIsRejected() {
+    assertFalse(
+        process(fieldWithTagsAt(new Translation3d(6.0, 0.0, 0.0)), observationAt(Pose3d.ZERO, Set.of(1)))
+            .isPresent(),
+        "a tag six metres away is past the gate");
+
+    assertTrue(
+        process(fieldWithTagsAt(new Translation3d(4.0, 0.0, 0.0)), observationAt(Pose3d.ZERO, Set.of(1)))
+            .isPresent(),
+        "a tag four metres away is inside it");
+  }
+
+  /**
    * One close tag is enough however far the others are, which is why the distance gate reads the
    * nearest rather than the average: under an average this pair would have been thrown away.
    */
@@ -357,6 +409,56 @@ public class AprilTagVisionProcessorTest {
         observationAt(Pose3d.ZERO, Set.of(1, 2)));
 
     assertTrue(observation.isPresent(), "a tag two metres away is a good look at the field");
+  }
+
+  // MARK: - The single-tag toggle
+
+  /**
+   * With the toggle off the robot runs on multi-tag frames and odometry. This is the switch to reach
+   * for when the log shows the estimate being pulled about by one-tag frames -- a camera whose
+   * calibration has drifted or whose mounting transform was measured wrong shows up there first,
+   * since a lone tag has no second tag to contradict it.
+   */
+  @Test
+  void aSingleTagObservationIsRefusedWhenTheFeatureIsOff() {
+    m_singleTagEstimationEnabled = false;
+
+    assertFalse(
+        process(
+            fieldWithTagsAt(new Translation3d(3.0, 0.0, 0.0)),
+            observationAt(Pose3d.ZERO, Set.of(1)))
+            .isPresent(),
+        "a one-tag frame is not a measurement when single-tag estimation is off");
+  }
+
+  /** The toggle turns off one-tag solves and nothing else. */
+  @Test
+  void aMultiTagObservationIsStillUsedWhenTheSingleTagFeatureIsOff() {
+    m_singleTagEstimationEnabled = false;
+
+    assertTrue(
+        process(
+            fieldWithTagsAt(new Translation3d(3.0, -0.25, 0.0), new Translation3d(3.0, 0.25, 0.0)),
+            observationAt(Pose3d.ZERO, Set.of(1, 2)))
+            .isPresent(),
+        "two tags are two tags however the single-tag toggle is set");
+  }
+
+  /**
+   * The toggle counts the tags the layout recognised, not the tags the solve claimed. A two-tag
+   * solve where one tag is off this field is a one-tag solve, and is the case where believing the
+   * claim would be worst: it means the cameras and the filter disagree about what field they are on.
+   */
+  @Test
+  void aSolveWithOnlyOneRecognisedTagCountsAsSingleTagForTheToggle() {
+    m_singleTagEstimationEnabled = false;
+
+    assertFalse(
+        process(
+            fieldWithTagsAt(new Translation3d(3.0, 0.0, 0.0)),
+            observationAt(Pose3d.ZERO, Set.of(1, 999)))
+            .isPresent(),
+        "a solve the layout can only place one tag of is a one-tag solve");
   }
 
   // MARK: - Where the range comes from
@@ -375,7 +477,7 @@ public class AprilTagVisionProcessorTest {
     Field field = fieldWithTagsAt(new Translation3d(4.0, 0.0, 0.0));
 
     double asMeasuredNear = submit(field, measuring(1.0)).stdDevs().get(0, 0);
-    double asMeasuredFar = submit(field, measuring(7.0)).stdDevs().get(0, 0);
+    double asMeasuredFar = submit(field, measuring(4.4)).stdDevs().get(0, 0);
     double fromTheSolvedPose = submit(field, observationAt(Pose3d.ZERO, Set.of(1)))
         .stdDevs().get(0, 0);
 
@@ -383,7 +485,7 @@ public class AprilTagVisionProcessorTest {
         "a tag measured at 1 m should be trusted more than the pose's 3.65 m implies: %f vs %f"
             .formatted(asMeasuredNear, fromTheSolvedPose));
     assertTrue(asMeasuredFar > fromTheSolvedPose,
-        "a tag measured at 7 m should be trusted less: %f vs %f"
+        "a tag measured at 4.4 m should be trusted less: %f vs %f"
             .formatted(asMeasuredFar, fromTheSolvedPose));
   }
 
@@ -424,7 +526,7 @@ public class AprilTagVisionProcessorTest {
     FakeCameraIO cameraIO = new FakeCameraIO();
 
     m_accepted.clear();
-    new AprilTagVisionProcessor(field, () -> m_velocities, m_accepted::add).process(List.of(
+    processor(field).process(List.of(
         observationFrom(cameraIO, Pose3d.ZERO, Set.of(1), NOW_SECONDS - 0.06),
         observationFrom(cameraIO, Pose3d.ZERO, Set.of(1), NOW_SECONDS - 0.03),
         observationFrom(cameraIO, Pose3d.ZERO, Set.of(1), NOW_SECONDS)));
@@ -443,7 +545,7 @@ public class AprilTagVisionProcessorTest {
     FakeCameraIO cameraIO = new FakeCameraIO();
 
     m_accepted.clear();
-    new AprilTagVisionProcessor(field, () -> m_velocities, m_accepted::add).process(List.of(
+    processor(field).process(List.of(
         observationFrom(cameraIO, Pose3d.ZERO, Set.of(1), NOW_SECONDS - 0.03),
         // Solved a metre into the air.
         observationFrom(
@@ -458,12 +560,20 @@ public class AprilTagVisionProcessorTest {
 
   // MARK: - Fixtures
 
+  /**
+   * A processor reading this test's velocities and toggle, so a test can vary either by assigning the
+   * field rather than by building its own.
+   */
+  private AprilTagVisionProcessor processor(Field field) {
+    return new AprilTagVisionProcessor(
+        field, () -> m_velocities, () -> m_singleTagEstimationEnabled, m_accepted::add);
+  }
+
   /** Runs one observation through a processor and returns the accepted result, if there was one. */
   private Optional<VisionObservation> process(Field field, AprilTagPoseObservation observation) {
     m_accepted.clear();
 
-    new AprilTagVisionProcessor(field, () -> m_velocities, m_accepted::add)
-        .process(List.of(observation));
+    processor(field).process(List.of(observation));
 
     return m_accepted.stream().findFirst();
   }
@@ -492,6 +602,21 @@ public class AprilTagVisionProcessorTest {
         ambiguity,
         reprojectionErrorPixels,
         NO_MEASURED_RANGES);
+  }
+
+  /**
+   * One standard deviation with the processor's floor taken back off, leaving the part the solve's
+   * geometry earned.
+   *
+   * <p>The floor is a fixed term added in quadrature, and the distance gate caps how large the
+   * geometric term beside it can get, so within the allowed range the two are comparable in size: a
+   * pair of tags four metres out prices itself at a few centimetres, which is roughly the floor.
+   * Subtracting it is what lets a test assert the exponent rather than measure the floor. Exact
+   * rather than approximate, since these tests hold the robot still and so contribute no motion
+   * term.
+   */
+  private static double geometricPart(double stdDev) {
+    return Math.sqrt(stdDev * stdDev - FLOOR_METERS * FLOOR_METERS);
   }
 
   /** An observation of tag 1 whose camera measured it at {@code rangeMeters}. */

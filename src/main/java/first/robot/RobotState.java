@@ -93,7 +93,10 @@ public class RobotState {
     // uses it to price timestamp error, and reading it from the estimate would make how much an
     // observation is trusted depend on the estimate that observation is about to correct.
     m_visionProcessor = new AprilTagVisionProcessor(
-        field, m_drive::getRobotRelativeSpeeds, m_poseEstimator::addVisionObservation);
+        field,
+        m_drive::getRobotRelativeSpeeds,
+        Tuning.kSingleTagEstimation,
+        m_poseEstimator::addVisionObservation);
 
     m_inAllianceZoneTrigger = new Trigger(this::inAllianceZone)
         .debounce(Seconds.of(0.2), DebounceType.FALLING);
@@ -170,6 +173,13 @@ public class RobotState {
 
   public void resetPose(Pose2d pose) {
     m_poseEstimator.resetPose(m_drive.getRawGyroAngle(), m_drive.getModulePositions(), pose);
+
+    // The simulated cameras are rendered from the odometry pose this just teleported, and the
+    // simulation keeps its own history of that pose which the teleport does not reach. Unless it is
+    // told, it renders the next frame or two from somewhere between the old pose and the new one --
+    // stamped after the reset, so the filter cannot recognise them as stale and undoes the reset on
+    // the strength of them. A no-op on a real robot.
+    m_vision.onPoseReset(pose);
   }
 
   /** The robot pose projected forward by {@code seconds} of its current motion. */

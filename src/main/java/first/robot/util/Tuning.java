@@ -63,6 +63,21 @@ public final class Tuning {
    */
   public static final Toggle kFixedTurretMode = Toggle.of("/Tuning/Turret/FixedTurretMode", false);
 
+  // MARK: - Vision
+
+  /**
+   * Whether one-tag solves correct the pose estimate at all, or only multi-tag ones do.
+   *
+   * <p>On by default, because a single tag is still a measurement and the filter prices it as one:
+   * most of a match is spent where only one tag is in view, and a robot that ignored those frames
+   * would run on odometry alone for most of it. Turn it off when the estimate is visibly being
+   * pulled about and the log shows the frames doing the pulling were one-tag ones — a camera with a
+   * drifting calibration or a mounting transform measured wrong shows up there first, since a
+   * one-tag solve has no second tag to contradict it.
+   */
+  public static final Toggle kSingleTagEstimation =
+      Toggle.of("/Tuning/Vision/SingleTagEstimation", true);
+
   // MARK: - Odometry
 
   /** Whether the pose estimate is clamped to keep the robot footprint inside the field walls. */

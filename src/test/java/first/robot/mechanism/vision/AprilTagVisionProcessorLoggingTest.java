@@ -83,15 +83,16 @@ class AprilTagVisionProcessorLoggingTest {
     // instance, and segfaults if it is touched before the driver station has been refreshed once.
     DriverStationBackend.refreshData();
 
-    // Tags at 2, 4 and 6 m, so the range logged for a loop says which of its frames was described.
+    // Tags at 2, 3 and 4 m, so the range logged for a loop says which of its frames was described,
+    // and all three are inside the distance gate so that nothing here is rejected for being far.
     Field field = fieldWithTagsAt(
         new Translation3d(2.0, 0.0, 0.0),
-        new Translation3d(4.0, 0.0, 0.0),
-        new Translation3d(6.0, 0.0, 0.0));
+        new Translation3d(3.0, 0.0, 0.0),
+        new Translation3d(4.0, 0.0, 0.0));
 
     List<VisionObservation> accepted = new ArrayList<>();
     AprilTagVisionProcessor processor =
-        new AprilTagVisionProcessor(field, ChassisVelocities::new, accepted::add);
+        new AprilTagVisionProcessor(field, ChassisVelocities::new, () -> true, accepted::add);
 
     RecordingReceiver receiver = new RecordingReceiver();
     Logger.AdvancedHooks.disableRobotBaseCheck();
@@ -146,11 +147,17 @@ class AprilTagVisionProcessorLoggingTest {
     assertEquals(3, backlog.get(kPrefix + "FakeCamera/ObservationCount", -1),
         "a backlog must be counted in full even though one frame is described");
     assertEquals(3, backlog.get(kPrefix + "FakeCamera/AcceptedCount", -1));
-    // The 6 m tag, which the newest frame saw; ranges are from the lens, 0.35 m ahead of the origin.
-    assertEquals(5.65, number(backlog, "FakeCamera/Model/RangeDistance"), 1.0e-6,
+    // The 4 m tag, which the newest frame saw; ranges are from the lens, 0.35 m ahead of the origin.
+    assertEquals(3.65, number(backlog, "FakeCamera/Model/RangeDistance"), 1.0e-6,
         "the newest of three equally good frames should be the one described");
     assertEquals(3, backlog.get(kPrefix + "FakeCamera/AcceptedRobotPoses", new Pose3d[0]).length,
         "every pose is still logged, since that is what a field view reads");
+    // The tag the newest frame saw, from the layout, so the described frame's tags and its range
+    // agree about which frame is being described.
+    assertArrayEquals(
+        new Pose3d[] {new Pose3d(new Translation3d(4.0, 0.0, 0.0), FACING_BACK)},
+        backlog.get(kPrefix + "FakeCamera/Model/TagPoses", new Pose3d[0]),
+        "the described frame's tags should be the ones it was solved from");
     assertEquals(0, backlog.get(kPrefix + "FakeCamera/RejectedRobotPoses", new Pose3d[0]).length,
         "nothing in this loop was rejected");
 
@@ -181,12 +188,16 @@ class AprilTagVisionProcessorLoggingTest {
     assertFalse(allRejected.get(kPrefix + "FakeCamera/Accepted", true));
     assertTrue(allRejected.get(kPrefix + "FakeCamera/RejectionReason", "").startsWith("Observation too stale"),
         "a loop that accepted nothing should still say why");
-    // The 4 m tag, which the newer of the two stale frames saw.
-    assertEquals(3.65, number(allRejected, "FakeCamera/Model/RangeDistance"), 1.0e-6,
+    // The 3 m tag, which the newer of the two stale frames saw.
+    assertEquals(2.65, number(allRejected, "FakeCamera/Model/RangeDistance"), 1.0e-6,
         "the newest rejection should be the one described");
     assertTrue(Double.isNaN(number(allRejected, "FakeCamera/StdDevs/X")),
         "a rejected observation's standard deviations should be absent, not zero");
     assertEquals(0, allRejected.get(kPrefix + "FakeCamera/AcceptedRobotPoses", new Pose3d[0]).length);
+    assertArrayEquals(
+        new Pose3d[] {new Pose3d(new Translation3d(3.0, 0.0, 0.0), FACING_BACK)},
+        allRejected.get(kPrefix + "FakeCamera/Model/TagPoses", new Pose3d[0]),
+        "a rejected frame still says which tags it came from");
     assertEquals(2, allRejected.get(kPrefix + "FakeCamera/RejectedRobotPoses", new Pose3d[0]).length,
         "a loop that accepted nothing still shows where its frames thought the robot was");
 
@@ -199,6 +210,8 @@ class AprilTagVisionProcessorLoggingTest {
     assertEquals(0, silent.get(kPrefix + "FakeCamera/RejectedRobotPoses", new Pose3d[0]).length,
         "a silent camera draws nothing on the field");
     assertEquals(-1, silent.get(kPrefix + "FakeCamera/Model/TagCount", 0));
+    assertEquals(0, silent.get(kPrefix + "FakeCamera/Model/TagPoses", new Pose3d[0]).length,
+        "a silent camera was solved from no tags, rather than still from its last ones");
 
     for (String key : List.of(
         "Model/RangeDistance",
@@ -222,7 +235,7 @@ class AprilTagVisionProcessorLoggingTest {
     // MARK: - Cameras are logged apart
 
     assertEquals(1.65, number(twoCameras, "FakeCamera/Model/RangeDistance"), 1.0e-6);
-    assertEquals(5.65, number(twoCameras, "OtherCamera/Model/RangeDistance"), 1.0e-6,
+    assertEquals(3.65, number(twoCameras, "OtherCamera/Model/RangeDistance"), 1.0e-6,
         "the second camera's frame should be its own, not the first camera's");
   }
 

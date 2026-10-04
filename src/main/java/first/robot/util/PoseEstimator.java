@@ -8,7 +8,6 @@ package first.robot.util;
 
 import static org.wpilib.units.Units.Seconds;
 
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
@@ -26,6 +25,7 @@ import org.wpilib.math.numbers.N1;
 import org.wpilib.math.numbers.N3;
 import org.wpilib.math.util.MathUtil;
 import org.wpilib.math.util.Nat;
+import org.wpilib.system.RobotController;
 import org.wpilib.units.measure.Time;
 
 import first.robot.util.Constants.RobotGeometryConstants;
@@ -41,7 +41,23 @@ import first.robot.util.Constants.RobotGeometryConstants;
  */
 public class PoseEstimator {
   private static final double kPoseBufferSizeSec = 2.0;
-  private static final Matrix<N3, N1> kOdometryStdDevs = new Matrix<>(VecBuilder.fill(1, 1, 0.2));
+
+  /**
+   * How far wheel travel is expected to be wrong over one cycle, in metres and radians.
+   *
+   * <p>These set how much of each vision correction is applied, and the sensitivity is not gentle:
+   * the gain works out to roughly {@code sigmaOdometry / (sigmaOdometry + sigmaVision)}, so a metre
+   * here against a vision observation worth five centimetres hands over 95% of the correction in a
+   * single frame. That is not a filter, it is a teleport, and it makes the estimate follow the worst
+   * frame of each loop rather than the weight of the evidence -- most visibly after a pose reset,
+   * where one stale sighting is enough to undo the whole reset.
+   *
+   * <p>Wheel travel over one 20 ms cycle is wrong by millimetres, not metres, which is where these
+   * come from. The result is a few percent of each observation applied per frame, so the estimate
+   * converges over a handful of frames and no single frame can move it far.
+   */
+  private static final Matrix<N3, N1> kOdometryStdDevs =
+      new Matrix<>(VecBuilder.fill(0.003, 0.003, 0.002));
   private static final double kMaxTiltDegrees = 25.0;
 
   private final SwerveDriveKinematics m_kinematics;
@@ -61,6 +77,8 @@ public class PoseEstimator {
       new SwerveModulePosition(),
       new SwerveModulePosition()
   };
+
+  private Time m_lastResetPoseTimestamp = Seconds.zero();
 
   public PoseEstimator(
       SwerveDriveKinematics kinematics,
@@ -83,6 +101,7 @@ public class PoseEstimator {
     m_odometryPose = pose;
     m_lastWheelPositions = wheelPositions;
     m_poseBuffer.clear();
+    m_lastResetPoseTimestamp = RobotController.getMeasureTime();
   }
 
   public Pose2d getEstimatedPose() {
@@ -121,12 +140,24 @@ public class PoseEstimator {
 
   /** Adds a new vision pose observation from the vision subsystem. */
   public void addVisionObservation(VisionObservation observation) {
-    // If measurement is old enough to be outside the pose buffer's timespan, skip.
-    try {
-      if (m_poseBuffer.getInternalBuffer().lastKey() - kPoseBufferSizeSec > observation.timestamp().in(Seconds)) {
-        return;
-      }
-    } catch (NoSuchElementException ex) {
+    // An observation the odometry buffer cannot place is not a measurement of anything this filter
+    // knows about. Both ends matter. Falling off the old end is the ordinary case of a frame that
+    // took too long to arrive; falling off the *new* end happens after a reset, which clears the
+    // buffer, and would otherwise be silent rather than rejected -- TimeInterpolatableBuffer answers
+    // a request from before its first sample with that first sample, so a pre-reset sighting would be
+    // replayed against the post-reset odometry pose as though it had been taken there. That is
+    // exactly the correction that drags the estimate back to where the robot used to be.
+    var buffer = m_poseBuffer.getInternalBuffer();
+    if (buffer.isEmpty()
+        || observation.timestamp().in(Seconds) < buffer.firstKey()
+        || buffer.lastKey() - kPoseBufferSizeSec > observation.timestamp().in(Seconds)) {
+      return;
+    }
+
+    // Throw out any timestamp earlier than the most recent pose reset
+    // This avoids the pose snapping back to observations before the reset
+    // This is mostly for sim, and (if anything) a detriment on the actual robot
+    if (observation.timestamp().lte(m_lastResetPoseTimestamp)) {
       return;
     }
 
