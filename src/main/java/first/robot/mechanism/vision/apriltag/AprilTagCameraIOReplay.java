@@ -3,11 +3,15 @@ package first.robot.mechanism.vision.apriltag;
 /**
  * A camera that reads nothing, for replay, where the log supplies every input.
  *
- * <p>Nothing to hold and nothing to do. What the camera is called and where it sits come from its
- * {@link AprilTagCameraConfig}, which {@link AprilTagCamera} already has, and everything the log
- * recorded arrives through the inputs object; so a replay IO is the absence of an IO, spelled out.
+ * <p>Nothing to do: everything the camera recorded arrives through the inputs object, so a replay IO
+ * is the absence of an IO, spelled out. It still carries the declaration, because that is how
+ * {@link AprilTagCamera} learns what this camera is called -- and the name is what selects its
+ * recorded inputs out of the log, so a replay camera that did not know its own name would read
+ * nothing back.
+ *
+ * @param config the camera this stands in for
  */
-public class AprilTagCameraIOReplay implements AprilTagCameraIO {
+public record AprilTagCameraIOReplay(AprilTagCameraConfig config) implements AprilTagCameraIO {
   @Override
   public void updateInputs(AprilTagCameraIOInputsAutoLogged inputs) {
   }
@@ -19,5 +23,10 @@ public class AprilTagCameraIOReplay implements AprilTagCameraIO {
 
   @Override
   public void setPipelineIndex(int pipelineId) {
+  }
+
+  @Override
+  public AprilTagCameraConfig getConfig() {
+    return config;
   }
 }

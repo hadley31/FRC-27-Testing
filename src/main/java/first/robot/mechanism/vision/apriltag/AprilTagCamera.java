@@ -9,26 +9,34 @@ import java.util.stream.Collectors;
 
 import first.lib.mechanism.LoggedComponent;
 
+/**
+ * One AprilTag camera: its declaration, the IO that reads it, and the inputs that come back, turned
+ * into whole {@link AprilTagPoseObservation}s for whatever consumes them.
+ *
+ * <p>Logged as {@code <vision>/<camera name>}. The name is the declared one rather than this class's
+ * -- every camera on the robot is this class -- and it is also what selects a camera's recorded
+ * inputs during replay, so renaming a camera in {@link AprilTagCameraConfig} orphans its old logs.
+ */
 public class AprilTagCamera implements LoggedComponent<AprilTagCameraIO, AprilTagCameraIOInputsAutoLogged> {
+  private final AprilTagVision m_vision;
   private final AprilTagCameraConfig m_config;
-  private final String m_name;
-  private final String m_logName;
   private final AprilTagCameraIO m_io;
   private final AprilTagCameraIOInputsAutoLogged m_inputs;
 
   /**
-   * @param config the camera as declared, which is what its observations are attributed to. Taken
-   *               here rather than read back off {@code io} because where a camera sits and what it
-   *               is called are declaration data: the IO was built from this same config, so asking
-   *               it would only be a round trip through a device that cannot know better.
-   * @param io     how to read the camera
+   * @param vision the vision mechanism this camera belongs to, which is what its inputs are logged
+   *               beneath. A camera is constructed by that mechanism for this reason.
+   * @param io     how to read the camera, and -- through {@link AprilTagCameraIO#getConfig()} -- the
+   *               declaration it was built from, which is what this camera is named after and what
+   *               its observations are attributed to. Held here rather than asked for per use: a
+   *               config is immutable declaration data, so there is nothing to re-read, and every
+   *               IO can only ever answer with the config it was built from.
    */
-  public AprilTagCamera(AprilTagCameraConfig config, AprilTagCameraIO io) {
-    m_config = config;
+  public AprilTagCamera(AprilTagVision vision, AprilTagCameraIO io) {
+    m_vision = vision;
+    m_config = io.getConfig();
     m_io = io;
     m_inputs = new AprilTagCameraIOInputsAutoLogged();
-    m_name = config.name();
-    m_logName = "Camera/" + m_name;
   }
 
   @Override
@@ -42,8 +50,13 @@ public class AprilTagCamera implements LoggedComponent<AprilTagCameraIO, AprilTa
   }
 
   @Override
-  public String getLogName() {
-    return m_logName;
+  public String getName() {
+    return m_config.name();
+  }
+
+  @Override
+  public AprilTagVision getMechanism() {
+    return m_vision;
   }
 
   /**

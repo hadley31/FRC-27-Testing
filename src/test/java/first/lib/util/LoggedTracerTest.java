@@ -16,8 +16,9 @@ import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.Logger;
 
 /**
- * Verifies the name-keyed span API: that durations reach the log, that nested spans do not truncate
- * each other, and that an unbalanced start or end degrades into a report rather than a wrong number.
+ * Verifies the span API: that durations reach the log under keys that mirror how the spans nest,
+ * that an enclosing span is not truncated by the ones inside it, and that an unbalanced or
+ * out-of-order call degrades into a report rather than a wrong number.
  */
 class LoggedTracerTest {
   private static final String kPrefix = "RealOutputs/LoggedTracer/";
@@ -40,8 +41,9 @@ class LoggedTracerTest {
     }
   }
 
-  private static double duration(LogTable entry, String name) {
-    return entry.get(kPrefix + name + "MS", -1.0);
+  /** The duration {@link LoggedTracer#endTrace} logs for a span, by the path it nests at. */
+  private static double duration(LogTable entry, String path) {
+    return entry.get(kPrefix + path + "/ElapsedTimeMS", -1.0);
   }
 
   @Test
@@ -64,17 +66,29 @@ class LoggedTracerTest {
       spin();
       LoggedTracer.endTrace("Simple");
 
-      // Nested spans: the outer one brackets the inner rather than being truncated by it, which is
-      // what keying by name buys over a single shared stopwatch.
+      // Nested spans: the outer one brackets the inner rather than being truncated by it, and the
+      // inner one is logged under the outer one's name.
       LoggedTracer.startTrace("Outer");
       spin();
       LoggedTracer.startTrace("Inner");
       spin();
+      assertEquals(List.of("Outer", "Outer/Inner"), LoggedTracer.getActiveTraces());
       LoggedTracer.endTrace("Inner");
+      assertEquals(List.of("Outer"), LoggedTracer.getActiveTraces());
       LoggedTracer.endTrace("Outer");
+      assertEquals(List.of(), LoggedTracer.getActiveTraces());
 
       // Ending a name that was never started is reported, not thrown.
       LoggedTracer.endTrace("NeverStarted");
+
+      // Closing an enclosing span while one inside it is still open: the enclosing span is still
+      // measured, and the abandoned inner path is reported.
+      LoggedTracer.startTrace("Enclosing");
+      spin();
+      LoggedTracer.startTrace("Abandoned");
+      LoggedTracer.endTrace("Enclosing");
+      assertEquals(List.of(), LoggedTracer.getActiveTraces(),
+          "mismatched end left the stack dirty");
 
       // A span whose endTrace never runs -- an early return or a throw in real code.
       LoggedTracer.startTrace("Leaked");
@@ -91,15 +105,22 @@ class LoggedTracerTest {
 
     assertTrue(duration(entry, "Simple") > 0.0, "no duration logged for a plain span");
 
-    double inner = duration(entry, "Inner");
+    // The inner span is logged beneath its parent, not at the top level.
+    double inner = duration(entry, "Outer/Inner");
     double outer = duration(entry, "Outer");
-    assertTrue(inner > 0.0, "inner span was not logged");
+    assertTrue(inner > 0.0, "inner span was not logged under its parent");
+    assertEquals(-1.0, duration(entry, "Inner"), "inner span was also logged at the top level");
     assertTrue(outer > inner,
         "outer span (" + outer + "ms) did not outlast the inner one (" + inner + "ms)");
 
     // An unmatched end logs no duration, only its name.
     assertEquals(-1.0, duration(entry, "NeverStarted"), "an unstarted span logged a duration");
     assertEquals("NeverStarted", entry.get(kPrefix + "UnstartedTraces", ""));
+
+    // An out-of-order end still measures the span it names and reports what it discarded.
+    assertTrue(duration(entry, "Enclosing") > 0.0, "a span closed out of order was not logged");
+    assertEquals(List.of("Enclosing/Abandoned"),
+        List.of(entry.get(kPrefix + "MismatchedTraces", new String[0])));
 
     // A span nothing ever closed is reported rather than silently leaked.
     assertEquals(List.of("Leaked"),

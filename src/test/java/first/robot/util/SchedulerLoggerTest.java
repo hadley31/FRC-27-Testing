@@ -8,14 +8,13 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.littletonrobotics.junction.LogDataReceiver;
+import org.littletonrobotics.junction.LogTable;
+import org.littletonrobotics.junction.Logger;
 import org.wpilib.command3.Command;
 import org.wpilib.command3.Scheduler;
 import org.wpilib.driverstation.internal.DriverStationBackend;
 import org.wpilib.hardware.hal.HAL;
-
-import org.littletonrobotics.junction.LogDataReceiver;
-import org.littletonrobotics.junction.LogTable;
-import org.littletonrobotics.junction.Logger;
 
 /**
  * Verifies that {@link SchedulerLogger} captures a command that schedules, runs and finishes inside
@@ -63,7 +62,8 @@ class SchedulerLoggerTest {
       Scheduler scheduler = Scheduler.createIndependentScheduler();
 
       // Never calls yield(), so it mounts, runs and completes inside one run() call.
-      Command oneShot = Command.noRequirements(coroutine -> {}).named("OneShot");
+      Command oneShot = Command.noRequirements(coroutine -> {
+      }).named("OneShot");
 
       // Yields twice, so it survives across ticks and the snapshot can see it.
       Command multiTick = Command.noRequirements(coroutine -> {
@@ -124,7 +124,7 @@ class SchedulerLoggerTest {
   private static void tick(Scheduler scheduler) {
     Logger.AdvancedHooks.invokePeriodicBeforeUser();
     scheduler.run();
-    SchedulerLogger.refresh(scheduler);
+    SchedulerLogger.log(scheduler);
     Logger.AdvancedHooks.invokePeriodicAfterUser(0, 0);
   }
 }

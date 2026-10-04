@@ -51,13 +51,13 @@ public interface AprilTagVisionFactory {
   /**
    * Returns the vision mechanism for a robot with these cameras, one IO per declaration.
    *
+   * <p>This is the whole of what a mode decides: which cameras exist is declaration data passed in,
+   * and the {@link AprilTagCamera}s themselves are built by the mechanism that owns them, so a
+   * factory only ever says how a camera is read.
+   *
    * @param cameras the cameras on the robot
    */
   default AprilTagVision createVision(List<AprilTagCameraConfig> cameras) {
-    return new AprilTagVision(
-        cameras.stream()
-            .map(config -> new AprilTagCamera(config, createCameraIO(config)))
-            .toList(),
-        createSim());
+    return new AprilTagVision(cameras.stream().map(this::createCameraIO).toList(), createSim());
   }
 }

@@ -34,6 +34,7 @@ public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
   private static final double NOT_REPORTED = -1.0;
 
   private final PhotonCamera m_camera;
+  private final AprilTagCameraConfig m_config;
   private final PhotonPoseEstimator m_poseEstimator;
   private final RobotHeadingSource m_headingSource;
 
@@ -45,6 +46,7 @@ public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
   public AprilTagCameraIOPhotonVision(
       AprilTagCameraConfig config, Field field, RobotHeadingSource headingSource) {
     m_camera = new PhotonCamera(config.name());
+    m_config = config;
     m_poseEstimator = new PhotonPoseEstimator(field, config.robotToCamera());
     m_headingSource = headingSource;
   }
@@ -199,5 +201,10 @@ public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
   @Override
   public void setPipelineIndex(int index) {
     m_camera.setPipelineIndex(index);
+  }
+
+  @Override
+  public AprilTagCameraConfig getConfig() {
+    return m_config;
   }
 }

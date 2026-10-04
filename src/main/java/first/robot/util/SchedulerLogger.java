@@ -11,12 +11,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.littletonrobotics.junction.Logger;
 import org.wpilib.command3.Command;
 import org.wpilib.command3.Mechanism;
 import org.wpilib.command3.Scheduler;
 import org.wpilib.command3.SchedulerEvent;
 
-import org.littletonrobotics.junction.Logger;
+import first.lib.util.LoggedTracer;
 
 /**
  * Logs command scheduler telemetry through AdvantageKit, so it lands in the log file and is
@@ -48,10 +49,9 @@ import org.littletonrobotics.junction.Logger;
 public class SchedulerLogger {
   private static final String kRoot = "Scheduler";
 
-  private static final Set<Scheduler> m_attached =
-      Collections.newSetFromMap(new IdentityHashMap<>());
+  private static final Set<Scheduler> m_attached = Collections.newSetFromMap(new IdentityHashMap<>());
 
-  /** What the scheduler reported during the current tick. Reset by each {@link #refresh}. */
+  /** What the scheduler reported during the current tick. Reset by each {@link #log}. */
   private static final class Tick {
     /** Human-readable lifecycle events, in the order they were emitted. */
     final List<String> events = new ArrayList<>();
@@ -72,7 +72,8 @@ public class SchedulerLogger {
       int priority,
       String[] requirements,
       double lastTimeMs,
-      double totalTimeMs) {}
+      double totalTimeMs) {
+  }
 
   private static final Tick m_tick = new Tick();
   private static final Map<String, CommandInfo> m_latched = new HashMap<>();
@@ -84,14 +85,23 @@ public class SchedulerLogger {
    */
   private static final Set<String> m_knownCommands = new HashSet<>();
 
-  private SchedulerLogger() {}
+  private SchedulerLogger() {
+  }
 
   /**
-   * Records the scheduler's state for this tick. Call once per loop, after {@link Scheduler#run()}.
+   * Records the scheduler's state for this tick. Call once per loop, after {@link Scheduler#run()},
+   * from the same thread that ran it: the events of the tick are collected in static state with no
+   * lock of its own.
    *
-   * @param scheduler the scheduler to log.
+   * <p>Traced as {@code SchedulerLogger.log}, so what this costs stays distinguishable from what
+   * the commands themselves cost.
+   *
+   * @param scheduler the scheduler to log. The first call for a given scheduler also subscribes to
+   *                  its events, which is why one is passed in rather than the default being
+   *                  assumed.
    */
-  public static void refresh(Scheduler scheduler) {
+  public static void log(Scheduler scheduler) {
+    LoggedTracer.startTrace("SchedulerLogger.log");
     if (m_attached.add(scheduler)) {
       scheduler.addEventListener(event -> onEvent(scheduler, event));
     }
@@ -143,6 +153,7 @@ public class SchedulerLogger {
     }
 
     m_tick.clear();
+    LoggedTracer.endTrace("SchedulerLogger.log");
   }
 
   private static void onEvent(Scheduler scheduler, SchedulerEvent event) {

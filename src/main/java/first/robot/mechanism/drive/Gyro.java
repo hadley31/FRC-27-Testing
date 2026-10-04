@@ -5,14 +5,24 @@ import org.wpilib.math.geometry.Rotation2d;
 import first.lib.mechanism.LoggedComponent;
 
 /**
- * The drivetrain's gyro, wrapped as its own logged input container so that {@link Drive} reads
- * heading the same way it reads a module: out of replayable inputs rather than off the hardware.
+ * The drivetrain's gyro, wrapped as its own logged component so that {@link Drive} reads heading the
+ * same way it reads a module: out of replayable inputs rather than off the hardware.
+ *
+ * <p>Logged as {@code Drive/Gyro}, which is the drivetrain's name and this class's own rather than a
+ * path written down here; see {@link LoggedComponent#getLogPrefix()}.
  */
 public class Gyro implements LoggedComponent<GyroIO, GyroIOInputsAutoLogged> {
+  private final Drive m_drive;
   private final GyroIO m_io;
   private final GyroIOInputsAutoLogged m_inputs = new GyroIOInputsAutoLogged();
 
-  public Gyro(GyroIO io) {
+  /**
+   * @param drive the drivetrain this gyro belongs to, which is what its inputs are logged beneath.
+   *              A gyro is constructed by its drivetrain for this reason.
+   * @param io    how to read the gyro
+   */
+  public Gyro(Drive drive, GyroIO io) {
+    m_drive = drive;
     m_io = io;
   }
 
@@ -27,8 +37,8 @@ public class Gyro implements LoggedComponent<GyroIO, GyroIOInputsAutoLogged> {
   }
 
   @Override
-  public String getLogName() {
-    return "Drive/Gyro";
+  public Drive getMechanism() {
+    return m_drive;
   }
 
   /**

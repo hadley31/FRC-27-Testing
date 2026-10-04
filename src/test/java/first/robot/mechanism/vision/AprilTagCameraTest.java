@@ -20,6 +20,7 @@ import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
 import first.robot.mechanism.vision.apriltag.AprilTagCameraIOInputsAutoLogged;
 import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
 import first.robot.mechanism.vision.apriltag.AprilTagPoseObservation;
+import first.robot.mechanism.vision.apriltag.AprilTagVision;
 
 /**
  * Covers the part of the multi-estimate path that only breaks at runtime: one estimate is spread
@@ -29,6 +30,9 @@ import first.robot.mechanism.vision.apriltag.AprilTagPoseObservation;
 public class AprilTagCameraTest {
   private static final Pose3d POSE_A = new Pose3d(new Translation3d(1, 2, 0), new Rotation3d());
   private static final Pose3d POSE_B = new Pose3d(new Translation3d(3, 4, 0), new Rotation3d());
+
+  private static final AprilTagCameraConfig CONFIG =
+      new AprilTagCameraConfig("FakeCamera", Transform3d.ZERO);
 
   /** An IO that reports a fixed set of estimates, standing in for a camera. */
   private static final class FakeCameraIO implements AprilTagCameraIO {
@@ -67,6 +71,11 @@ public class AprilTagCameraTest {
     @Override
     public void setPipelineIndex(int pipelineId) {
     }
+
+    @Override
+    public AprilTagCameraConfig getConfig() {
+      return CONFIG;
+    }
   }
 
   /** Fills inputs from the IO, then round-trips them through a log table the way replay does. */
@@ -74,7 +83,7 @@ public class AprilTagCameraTest {
       double[] ambiguities, double[] reprojectionErrorsPixels, int[][] tagIds,
       double[][] tagRangesMeters) {
     AprilTagCamera camera = new AprilTagCamera(
-        new AprilTagCameraConfig("FakeCamera", Transform3d.ZERO),
+        new AprilTagVision(List.of()),
         new FakeCameraIO(timestampsSeconds, observedRobotPoses, ambiguities,
             reprojectionErrorsPixels, tagIds, tagRangesMeters));
     camera.getIO().updateInputs(camera.getInputs());

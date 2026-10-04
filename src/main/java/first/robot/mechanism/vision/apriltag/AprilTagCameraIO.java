@@ -81,4 +81,6 @@ public interface AprilTagCameraIO extends LoggedComponentIO<AprilTagCameraIOInpu
   public int getPipelineIndex();
 
   public void setPipelineIndex(int pipelineId);
+
+  public AprilTagCameraConfig getConfig();
 }

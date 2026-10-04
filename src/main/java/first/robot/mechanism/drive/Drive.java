@@ -51,18 +51,26 @@ public class Drive implements LoggedMultiComponentMechanism {
 
   private List<OdometryObservation> m_odometryObservations = List.of();
 
+  /**
+   * Takes the IO for each piece of hardware and builds the components around them here, rather than
+   * being handed the components: a component is logged beneath the mechanism that owns it and so has
+   * to be told which one that is, which cannot happen before this constructor runs. What varies
+   * between a real robot, simulation and replay therefore stops at the IO layer -- see
+   * {@code Robot.createGyroIO} and {@code Robot.createSwerveModuleIO} -- and the four corners'
+   * names, which are the keys their inputs replay from, are fixed here.
+   */
   public Drive(
       GyroIO gyroIO,
       SwerveModuleIO frontLeftIO,
       SwerveModuleIO frontRightIO,
       SwerveModuleIO backLeftIO,
       SwerveModuleIO backRightIO) {
-    m_gyro = new Gyro(gyroIO);
+    m_gyro = new Gyro(this, gyroIO);
     m_modules = new SwerveModule[] {
-        new SwerveModule(frontLeftIO, "FrontLeft"),
-        new SwerveModule(frontRightIO, "FrontRight"),
-        new SwerveModule(backLeftIO, "BackLeft"),
-        new SwerveModule(backRightIO, "BackRight"),
+        new SwerveModule(this, frontLeftIO, "FrontLeft"),
+        new SwerveModule(this, frontRightIO, "FrontRight"),
+        new SwerveModule(this, backLeftIO, "BackLeft"),
+        new SwerveModule(this, backRightIO, "BackRight"),
     };
 
     m_ioContainers.add(m_gyro);
@@ -70,7 +78,7 @@ public class Drive implements LoggedMultiComponentMechanism {
 
     PhoenixOdometryThread.getInstance().start();
 
-    getRegisteredScheduler().addPeriodic(this::periodic);
+    getRegisteredScheduler().addPeriodic(() -> LoggedTracer.traced(getName(), this::periodic));
   }
 
   @Override
@@ -79,8 +87,6 @@ public class Drive implements LoggedMultiComponentMechanism {
   }
 
   private void periodic() {
-    LoggedTracer.startTrace("Drive/Periodic");
-
     // The odometry thread fills the IO queues from another thread, so hold its lock while they are
     // drained: without it a pass of that thread could land between two modules' reads and leave
     // their sample counts out of step.
@@ -104,8 +110,6 @@ public class Drive implements LoggedMultiComponentMechanism {
 
     Logger.recordOutput("Drive/ModuleVelocities/Measured", getModuleVelocities());
     Logger.recordOutput("Drive/ChassisVelocities/Measured", getRobotRelativeSpeeds());
-
-    LoggedTracer.endTrace("Drive/Periodic");
   }
 
   /**

@@ -11,8 +11,33 @@ import org.wpilib.units.Measure;
 
 public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInputs, U extends Measure<?>>
     extends Mechanism, LoggedComponent<T, I> {
+  /**
+   * Resolves the two inherited defaults, which Java will not pick between: {@link Mechanism} and
+   * {@link LoggedComponent} each supply a {@code getName()}. They agree -- both are the class's
+   * simple name -- but a mechanism's name is the one the scheduler and every command name is built
+   * from, so that is the one deferred to here.
+   */
   @Override
-  public default String getLogName() {
+  public default String getName() {
+    return Mechanism.super.getName();
+  }
+
+  /**
+   * A mechanism that is its own component: there is no outer mechanism to be filed beneath.
+   *
+   * @return {@code this}
+   */
+  @Override
+  public default G3Mechanism<T, I, U> getMechanism() {
+    return this;
+  }
+
+  /**
+   * Just the mechanism's name, rather than {@code getMechanism()/getName()} as it would be for a
+   * component with an owner -- which here is the same name twice.
+   */
+  @Override
+  public default String getLogPrefix() {
     return getName();
   }
 

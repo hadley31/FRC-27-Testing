@@ -8,26 +8,36 @@ import org.wpilib.math.geometry.Pose2d;
 import first.lib.mechanism.LoggedComponent;
 import first.lib.mechanism.LoggedMultiComponentMechanism;
 
+/**
+ * Every AprilTag camera on the robot, as one mechanism: it reads them once per loop, hands their
+ * observations on, and -- in simulation -- renders the field they are looking at first.
+ *
+ * <p>The cameras are built here from the IO that reads each of them, because a camera is logged
+ * beneath the mechanism that owns it and so has to be told which one that is. Which cameras exist
+ * stays a decision for {@link AprilTagVisionFactory}, and nothing in this class knows that a robot
+ * mode exists.
+ */
 public class AprilTagVision implements LoggedMultiComponentMechanism {
   private final List<AprilTagCamera> m_cameras;
   private final Optional<AprilTagVisionSim> m_sim;
 
   /** Cameras with nothing simulated behind them, which is every camera on a real robot. */
-  public AprilTagVision(List<AprilTagCamera> cameras) {
-    this(cameras, Optional.empty());
+  public AprilTagVision(List<AprilTagCameraIO> cameraIOs) {
+    this(cameraIOs, Optional.empty());
   }
 
   /**
-   * @param cameras the cameras on the robot, each pairing a declaration with the IO that reads it.
-   *                Built outside rather than from configs here, so that what reads a camera stays a
-   *                decision for {@link AprilTagVisionFactory} and this class never has to know a
-   *                mode exists.
-   * @param sim     the field these cameras are looking at, when it is one this robot code is
-   *                rendering; empty on a real robot, where the field is simply there. Held rather
-   *                than merely stepped so that {@link #resetRobotPose} has something to forward to.
+   * @param cameraIOs how to read each camera on the robot, one per declared camera. The IO is what
+   *                  varies between a real robot, simulation and replay, so it is built outside and
+   *                  passed in; the {@link AprilTagCamera} around it is built here, since a camera
+   *                  has to name this mechanism to know what to log beneath.
+   * @param sim       the field these cameras are looking at, when it is one this robot code is
+   *                  rendering; empty on a real robot, where the field is simply there. Held rather
+   *                  than merely stepped so that {@link #resetRobotPose} has something to forward
+   *                  to.
    */
-  public AprilTagVision(List<AprilTagCamera> cameras, Optional<AprilTagVisionSim> sim) {
-    m_cameras = List.copyOf(cameras);
+  public AprilTagVision(List<AprilTagCameraIO> cameraIOs, Optional<AprilTagVisionSim> sim) {
+    m_cameras = cameraIOs.stream().map(io -> new AprilTagCamera(this, io)).toList();
     m_sim = sim;
 
     getRegisteredScheduler().addPeriodic(this::periodic);

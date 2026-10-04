@@ -6,6 +6,8 @@ package first.robot;
 
 import static first.robot.util.Constants.ElectricalConstants.CAN_BUS;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.LogFileUtil;
@@ -143,7 +145,7 @@ public class Robot extends LoggedRobot {
       // Replay reads nothing, since the log supplies the inputs, and must not construct a real
       // camera: that would open NetworkTables subscriptions and run a coprocessor version check for
       // values that are about to be overwritten from the log.
-      case REPLAY -> config -> new AprilTagCameraIOReplay();
+      case REPLAY -> AprilTagCameraIOReplay::new;
     };
   }
 
@@ -162,10 +164,34 @@ public class Robot extends LoggedRobot {
         : new SwerveModuleIOSim(constants);
   }
 
+  /**
+   * Starts AdvantageKit: stamps the log with what built it, then picks where the log goes for the
+   * current mode.
+   *
+   * <p>The metadata is what makes a log traceable back to the code that produced it. It comes from
+   * {@link BuildConstants}, which the build regenerates from git, so a log found later can be
+   * replayed against the exact commit that wrote it -- and says so when that commit had uncommitted
+   * changes, which is the one case where the SHA is not the whole story.
+   */
   private void configureLogging() {
-    Logger.recordMetadata("ProjectName", "FRC-27-Testing");
-    Logger.recordMetadata("RuntimeType", getRuntimeType().toString());
-
+    Logger.recordMetadata("ProjectName", BuildConstants.MAVEN_NAME);
+    Logger.recordMetadata("BuildDate", BuildConstants.BUILD_DATE);
+    Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
+    Logger.recordMetadata("GitDate", BuildConstants.GIT_DATE);
+    Logger.recordMetadata("GitBranch", BuildConstants.GIT_BRANCH);
+    Logger.recordMetadata(
+        "GitDirty",
+        switch (BuildConstants.DIRTY) {
+          case 0 -> "All changes committed";
+          case 1 -> "Uncommitted changes";
+          default -> "Unknown";
+        });
+    try {
+      Logger.recordMetadata(
+          "Hostname", InetAddress.getLocalHost().getHostName().replaceAll("\\.local$", ""));
+    } catch (UnknownHostException e) {
+      Logger.recordMetadata("Hostname", "Unknown");
+    }
     switch (Constants.RobotModeConstants.CURRENT_MODE) {
       case REAL -> {
         // Log to a USB stick ("/U/logs") and publish live data to NetworkTables.
@@ -187,14 +213,12 @@ public class Robot extends LoggedRobot {
   @Override
   public void robotPeriodic() {
     LoggedTracer.reset();
-    Scheduler.getDefault().run();
-    LoggedTracer.record("Scheduler/run");
-    SchedulerLogger.refresh(Scheduler.getDefault());
-    LoggedTracer.record("SchedulerLogger/refresh");
+    LoggedTracer.traced("Scheduler.run", Scheduler.getDefault()::run);
+    SchedulerLogger.log(Scheduler.getDefault());
 
     // Every span opened this loop should have been closed by now, so anything still open never
     // reached its endTrace -- an early return or a thrown exception in between. Dropping them here
-    // keeps a leaked entry from making that name's next measurement run from a stale start, and
+    // keeps a leaked span from swallowing the next loop's measurements as children of itself, and
     // publishes the offenders so the mistake is visible.
     LoggedTracer.clearTraces();
   }
