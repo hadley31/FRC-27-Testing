@@ -5,7 +5,9 @@ import static org.wpilib.units.Units.Degrees;
 import static org.wpilib.units.Units.Meters;
 import static org.wpilib.units.Units.Seconds;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -30,6 +32,7 @@ import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
 import first.robot.mechanism.turret.Turret;
 import first.robot.mechanism.vision.apriltag.AprilTagVision;
+import first.robot.mechanism.vision.apriltag.AprilTagVisionSim;
 import first.robot.util.Constants.RobotGeometryConstants;
 import first.robot.util.FieldConstants;
 import first.robot.util.PoseEstimator;
@@ -120,6 +123,24 @@ class RobotStateTest {
     }
   }
 
+  /** A simulated field that renders nothing and remembers only the teleports it is told about. */
+  private static final class RecordingVisionSim implements AprilTagVisionSim {
+    private final List<Pose2d> m_teleports = new ArrayList<>();
+
+    @Override
+    public void update() {
+    }
+
+    @Override
+    public void resetRobotPose(Pose2d robotPose) {
+      m_teleports.add(robotPose);
+    }
+
+    private List<Pose2d> teleports() {
+      return m_teleports;
+    }
+  }
+
   private FakeDrive m_drive;
   private Turret m_turret;
   private RobotState m_state;
@@ -134,6 +155,10 @@ class RobotStateTest {
   }
 
   private RobotState newState() {
+    return newState(new AprilTagVision(List.of()));
+  }
+
+  private RobotState newState(AprilTagVision vision) {
     m_drive = new FakeDrive();
     m_turret = new Turret(new StubAngleIO());
 
@@ -142,7 +167,7 @@ class RobotStateTest {
 
     m_state = new RobotState(
         m_drive, m_turret, new Hood(new StubAngleIO()), new Flywheel(new StubVelocityIO()),
-        new AprilTagVision(List.of()), poseEstimator, Fields.DEFAULT_FIELD.loadField());
+        vision, poseEstimator, Fields.DEFAULT_FIELD.loadField());
     return m_state;
   }
 
@@ -266,5 +291,29 @@ class RobotStateTest {
 
     assertEquals(halfLength, clamped.getX(), kEpsilon);
     assertEquals(halfWidth, clamped.getY(), kEpsilon);
+  }
+
+  // MARK: - Pose resets
+
+  /**
+   * A pose reset reaches the simulated field, which is the one part of that plumbing this code owns.
+   *
+   * <p>Worth a test precisely because it is unfalsifiable from the robot's point of view: the call
+   * does nothing on real hardware, where moving a pose estimate moves no robots, so it reads as
+   * dead code to anyone tidying up and nothing but this notices when it goes. What it costs to lose
+   * is described on {@link AprilTagVisionSim#resetRobotPose} -- the simulation keeps rendering the
+   * robot part way back to where it was teleported from, on frames stamped after the reset, and the
+   * filter undoes the reset on the strength of them.
+   */
+  @Test
+  void resettingThePoseTellsTheSimulatedFieldTheRobotWasPutThere() {
+    var visionSim = new RecordingVisionSim();
+    var state = newState(new AprilTagVision(List.of(), Optional.of(visionSim)));
+    var pose = new Pose2d(5.0, 4.0, Rotation2d.CCW_90DEG);
+
+    state.resetPose(pose);
+
+    assertEquals(List.of(pose), visionSim.teleports(),
+        "the simulated field should have been told about the teleport, exactly once");
   }
 }

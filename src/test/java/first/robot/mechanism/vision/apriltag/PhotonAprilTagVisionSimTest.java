@@ -3,6 +3,7 @@ package first.robot.mechanism.vision.apriltag;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -80,65 +81,35 @@ public class PhotonAprilTagVisionSimTest {
     assertTrue(error < 0.5, "estimate was %.3f m from the true pose".formatted(error));
   }
 
+
   // MARK: - Pose resets
 
+  /** How often the simulation is rendered while the teleport test is waiting on the camera. */
+  private static final long PUMP_INTERVAL_MILLIS = 2;
+
+  /** Enough pumping to cover more than one frame period at any plausible frame rate. */
+  private static final int PUMP_LIMIT = 150;
+
   /**
-   * A robot told it has been teleported is rendered where it has been put.
+   * A robot told it has been teleported is rendered where it has been put — by the simulation these
+   * cameras are actually looking at.
    *
-   * <p>Which is the whole job of {@code resetRobotPose}, and the paired test below is what shows it
-   * is doing it: the simulation renders each frame from the pose at that frame's capture time, so
-   * without being told it keeps a trail of poses leading back to where the robot came from and
-   * renders across the jump.
+   * <p>Which is the whole job of {@code resetRobotPose}. The simulation renders each frame from the
+   * pose at that frame's capture time, so it keeps a trail of recent poses, and a teleport leaves a
+   * discontinuity in that trail for the renderer to interpolate across. What this pins down is that
+   * clearing the trail reaches the instance the cameras render from, which is the half of the job
+   * that is ours to get wrong; what goes wrong when the trail is not cleared is PhotonVision's
+   * behaviour, and is described on {@link AprilTagVisionSim#resetRobotPose} rather than asserted
+   * here.
    */
   @Test
   void aTeleportTheSimulationIsToldAboutIsRenderedAtTheNewPose() throws InterruptedException {
-    Teleport teleport = teleportAfterBuildingHistory(true);
-
-    assertTrue(teleport.distanceFromNewPose() < teleport.distanceFromOldPose(),
-        "the first frame after the reset should describe the new pose: %.3f m from it against %.3f m from the old one"
-            .formatted(teleport.distanceFromNewPose(), teleport.distanceFromOldPose()));
-    assertTrue(teleport.distanceFromNewPose() < 0.5,
-        "estimate was %.3f m from the new pose".formatted(teleport.distanceFromNewPose()));
-  }
-
-  /**
-   * The failure {@code resetRobotPose} exists to prevent, pinned down so that the test above cannot
-   * pass for the wrong reason.
-   *
-   * <p>Not a test of our own code but a characterisation of PhotonVision's: moving the pose the
-   * simulation is handed, without clearing its history, leaves it rendering the robot back where it
-   * was — on frames stamped after the move, which is what makes them undetectable downstream. If
-   * this ever starts failing, PhotonVision has changed and {@code resetRobotPose} may no longer be
-   * needed.
-   */
-  @Test
-  void aTeleportTheSimulationIsNotToldAboutIsStillRenderedAtTheOldPose() throws InterruptedException {
-    Teleport teleport = teleportAfterBuildingHistory(false);
-
-    assertTrue(teleport.distanceFromOldPose() < teleport.distanceFromNewPose(),
-        "an untold simulation should still be rendering the old pose: %.3f m from it against %.3f m from the new one"
-            .formatted(teleport.distanceFromOldPose(), teleport.distanceFromNewPose()));
-  }
-
-  /** Where the first frame after a teleport put the robot, relative to the two candidate poses. */
-  private record Teleport(double distanceFromOldPose, double distanceFromNewPose) {
-  }
-
-  /**
-   * Builds up a pose history, moves the robot a metre sideways, and reports where the next frame
-   * placed it.
-   *
-   * <p>Sideways rather than along the camera's bore because that is the axis a tag pins down best,
-   * so the two candidate poses are as far apart as the camera can tell; a metre also keeps the tag
-   * inside the lens.
-   *
-   * @param tellTheSimulation whether to call {@code resetRobotPose}, which is the one thing the two
-   *                          tests above differ by
-   */
-  private static Teleport teleportAfterBuildingHistory(boolean tellTheSimulation)
-      throws InterruptedException {
     Pose3d tagPose = FIELD.getTagPose(FIELD.getTags().get(0).getID()).orElseThrow();
     Pose2d oldPose = facing(tagPose);
+
+    // Sideways rather than along the camera's bore because that is the axis a tag pins down best,
+    // so the two candidate poses are as far apart as the camera can tell; a metre also keeps the
+    // tag inside the lens.
     Pose2d newPose = oldPose.plus(new Transform2d(0.0, 1.0, Rotation2d.ZERO));
 
     // The simulation pulls the robot's true pose every render, the way it does on the robot, so
@@ -147,40 +118,61 @@ public class PhotonAprilTagVisionSimTest {
 
     PhotonAprilTagVisionSim visionSim = new PhotonAprilTagVisionSim(FIELD, groundTruth::get);
     AprilTagCameraIO io = AprilTagCameraIOPhotonVision.simulated(
-        new AprilTagCameraConfig("ResetTestCamera" + tellTheSimulation, ROBOT_TO_CAMERA),
+        new AprilTagCameraConfig("ResetTestCamera", ROBOT_TO_CAMERA),
         FIELD,
         newPose::getRotation,
         visionSim);
 
     AprilTagCameraIOInputsAutoLogged inputs = new AprilTagCameraIOInputsAutoLogged();
 
-    // Long enough to span the camera's latency, so there is a history to be wrongly interpolated
-    // across. Frames are read and discarded rather than left to queue, so that what gets examined
-    // below is a frame rendered after the move.
-    for (int i = 0; i < 20; i++) {
-      visionSim.update();
-      io.updateInputs(inputs);
-      Thread.sleep(5);
-    }
+    // A frame of history at the old pose, so there is a trail for the reset to clear and the
+    // assertion below would have something to catch if it were not cleared. Frames are read on the
+    // loop they arrive rather than left to queue, so that what gets examined is a frame rendered
+    // after the move.
+    pumpForFrame(visionSim, io, inputs)
+        .orElseThrow(() -> new AssertionError("expected a frame from the simulated camera"));
 
     groundTruth.set(newPose);
-    if (tellTheSimulation) {
-      visionSim.resetRobotPose(newPose);
-    }
+    visionSim.resetRobotPose(newPose);
 
-    inputs.observedRobotPoses = new Pose3d[0];
-    for (int i = 0; i < 60 && inputs.observedRobotPoses.length == 0; i++) {
+    // Which frame arrives first does not matter here, whatever the camera's shutter is doing: the
+    // reset leaves the pose buffer holding the new pose and nothing else, so every exposure after
+    // it renders from the new pose whether it is stamped before or after the move.
+    Pose3d observed = pumpForFrame(visionSim, io, inputs)
+        .orElseThrow(() -> new AssertionError("expected a frame after the move"));
+
+    Translation2d reported = observed.toPose2d().getTranslation();
+    double fromNewPose = reported.getDistance(newPose.getTranslation());
+    double fromOldPose = reported.getDistance(oldPose.getTranslation());
+
+    assertTrue(fromNewPose < fromOldPose,
+        "the first frame after the reset should describe the new pose: %.3f m from it against %.3f m from the old one"
+            .formatted(fromNewPose, fromOldPose));
+    assertTrue(fromNewPose < 0.5, "estimate was %.3f m from the new pose".formatted(fromNewPose));
+  }
+
+  /**
+   * Renders the simulation until a frame reaches the IO, and hands back the pose it was solved to.
+   *
+   * @return the pose, or empty if the camera produced no frame within the budget
+   */
+  private static Optional<Pose3d> pumpForFrame(
+      PhotonAprilTagVisionSim visionSim,
+      AprilTagCameraIO io,
+      AprilTagCameraIOInputsAutoLogged inputs) throws InterruptedException {
+    for (int i = 0; i < PUMP_LIMIT; i++) {
       visionSim.update();
       io.updateInputs(inputs);
-      Thread.sleep(5);
+
+      // Index zero is the oldest frame in the batch, which is the first one the camera produced
+      // since the last read -- the one closest to whatever just happened.
+      if (inputs.observedRobotPoses.length > 0) {
+        return Optional.of(inputs.observedRobotPoses[0]);
+      }
+
+      Thread.sleep(PUMP_INTERVAL_MILLIS);
     }
 
-    assertTrue(inputs.observedRobotPoses.length > 0, "expected a frame after the move");
-
-    Translation2d reported = inputs.observedRobotPoses[0].toPose2d().getTranslation();
-
-    return new Teleport(
-        reported.getDistance(oldPose.getTranslation()),
-        reported.getDistance(newPose.getTranslation()));
+    return Optional.empty();
   }
 }
