@@ -7,8 +7,6 @@ import static org.wpilib.units.Units.Feet;
 
 import org.junit.jupiter.api.Test;
 
-import first.lib.util.InterpolatingMeasureTreeMap;
-
 /**
  * Pins the parts of {@link InterpolatingMeasureTreeMap} that a live-tuned table depends on.
  *
