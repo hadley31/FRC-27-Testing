@@ -1,10 +1,5 @@
 package first.robot.util;
 
-import static org.wpilib.units.Units.Degrees;
-import static org.wpilib.units.Units.Feet;
-import static org.wpilib.units.Units.RPM;
-import static org.wpilib.units.Units.Seconds;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -12,16 +7,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.ToDoubleFunction;
 
-import org.wpilib.units.AngleUnit;
-import org.wpilib.units.AngularVelocityUnit;
-import org.wpilib.units.DistanceUnit;
-import org.wpilib.units.TimeUnit;
 import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 import org.wpilib.units.measure.Distance;
 import org.wpilib.units.measure.Time;
 
 import first.lib.util.InterpolatingMeasureTreeMap;
+import first.lib.util.UnitDoubleConverter;
 
 /**
  * A shot table as rows rather than as three independent curves: one range, and everything the shooter
@@ -50,16 +42,16 @@ import first.lib.util.InterpolatingMeasureTreeMap;
  */
 public final class ShotProfileTable {
   /** The unit the distance column is declared, published and exported in. */
-  public static final DistanceUnit kDistanceUnit = Feet;
+  public static final UnitDoubleConverter<Distance> kDistanceUnit = UnitDoubleConverter.FEET;
 
   /** The unit the time-of-flight column is declared, published and exported in. */
-  public static final TimeUnit kTimeUnit = Seconds;
+  public static final UnitDoubleConverter<Time> kTimeUnit = UnitDoubleConverter.SECONDS;
 
   /** The unit the hood angle column is declared, published and exported in. */
-  public static final AngleUnit kAngleUnit = Degrees;
+  public static final UnitDoubleConverter<Angle> kAngleUnit = UnitDoubleConverter.DEGREES;
 
   /** The unit the flywheel column is declared, published and exported in. */
-  public static final AngularVelocityUnit kAngularVelocityUnit = RPM;
+  public static final UnitDoubleConverter<AngularVelocity> kAngularVelocityUnit = UnitDoubleConverter.RPM;
 
   /**
    * A table of one row interpolates to the same values at every range, which is never what someone

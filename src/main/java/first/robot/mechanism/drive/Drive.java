@@ -202,12 +202,27 @@ public class Drive implements LoggedMultiComponentMechanism {
   }
 
   public Command driveCommand(Supplier<ChassisVelocities> speeds) {
+    return driveCommand(speeds, "Drive");
+  }
+
+  /**
+   * Drives at whatever {@code speeds} reports, until canceled.
+   *
+   * <p>The name is a parameter because several of these exist at once -- the driver's, and whatever
+   * the robot is doing with the chassis on its own account -- and {@code SchedulerLogger} keys each
+   * command's telemetry on its name. Commands sharing one name share one subtable and overwrite each
+   * other's timings within a single loop, so distinct names are what make the log readable rather
+   * than a matter of taste.
+   *
+   * @param name what this particular drive command is for, not the mechanism it drives
+   */
+  public Command driveCommand(Supplier<ChassisVelocities> speeds, String name) {
     return run(coroutine -> {
       while (true) {
         drive(speeds.get());
         coroutine.yield();
       }
-    }).named("Drive");
+    }).named(name);
   }
 
   /**

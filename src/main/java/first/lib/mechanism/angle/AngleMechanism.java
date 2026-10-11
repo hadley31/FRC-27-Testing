@@ -6,6 +6,7 @@ import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 
 import first.lib.mechanism.G3Mechanism;
+import first.lib.util.UnitDoubleConverter;
 
 public interface AngleMechanism<T extends AngleMechanismIO>
     extends G3Mechanism<T, AngleMechanismInputsAutoLogged, Angle> {
@@ -36,5 +37,10 @@ public interface AngleMechanism<T extends AngleMechanismIO>
   @Override
   default Angle getDefaultTolerance() {
     return Degrees.of(0.5);
+  }
+
+  @Override
+  default UnitDoubleConverter<Angle> getMeasureType() {
+    return UnitDoubleConverter.DEGREES;
   }
 }

@@ -72,9 +72,6 @@ public final class TunableShotProfile extends LoggedNetworkInput {
   private TunableShotProfile(
       String path, Time actuationLatency, ShotProfileTable competitionDefault, boolean persistent) {
     m_path = path;
-    // Logger.recordOutput keys are relative: it prefixes them with "RealOutputs/" itself, so a leading
-    // slash here would publish to /AdvantageKit/RealOutputs//Tuning/..., which dashboards show as an
-    // unnamed folder. The NT paths the columns publish to are absolute; these keys are not.
     m_outputKey = path.startsWith("/") ? path.substring(1) : path;
     m_competitionDefault = competitionDefault;
     m_accepted = competitionDefault;

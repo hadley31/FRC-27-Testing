@@ -5,7 +5,6 @@ import java.util.Optional;
 
 import org.wpilib.math.geometry.Pose2d;
 
-import first.lib.mechanism.LoggedComponent;
 import first.lib.mechanism.LoggedMultiComponentMechanism;
 
 /**
@@ -73,7 +72,7 @@ public class AprilTagVision implements LoggedMultiComponentMechanism {
   }
 
   @Override
-  public List<? extends LoggedComponent<?, ?>> getComponents() {
+  public List<AprilTagCamera> getComponents() {
     return m_cameras;
   }
 

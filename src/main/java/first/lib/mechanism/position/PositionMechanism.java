@@ -6,6 +6,7 @@ import org.wpilib.units.measure.Distance;
 import org.wpilib.units.measure.LinearVelocity;
 
 import first.lib.mechanism.G3Mechanism;
+import first.lib.util.UnitDoubleConverter;
 
 public interface PositionMechanism<T extends PositionMechanismIO>
     extends G3Mechanism<T, PositionMechanismInputsAutoLogged, Distance> {
@@ -36,5 +37,10 @@ public interface PositionMechanism<T extends PositionMechanismIO>
   @Override
   default Distance getDefaultTolerance() {
     return Inches.of(0.25);
+  }
+
+  @Override
+  default UnitDoubleConverter<Distance> getMeasureType() {
+    return UnitDoubleConverter.INCHES;
   }
 }

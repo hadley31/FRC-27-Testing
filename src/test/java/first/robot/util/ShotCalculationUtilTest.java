@@ -262,4 +262,68 @@ class ShotCalculationUtilTest {
       previous = current;
     }
   }
+
+  // MARK: - Chassis aiming (fixed turret)
+
+  @Test
+  void chassisHeadingPutsTheBoreOnTheAimPoint() {
+    // Solve from a chassis yawed 90 CCW, which the fixture above pins at a -90 turret angle. Ask
+    // what heading would let a bore parked at zero make that same shot, then re-solve from there:
+    // the turret should have nothing left to do. Because the test supplies the pivot directly, the
+    // parallax the real robot sees is absent and this must come out exactly zero.
+    var snapshot = new TurretSnapshot(
+        kTurretPosition, Rotation2d.CCW_90DEG, new ChassisVelocities());
+    var parameters = kCompensating.calculateShot(snapshot, kTarget, ShotProfile.kScoring);
+
+    var heading = ShotCalculationUtil.chassisHeadingForTurretBore(
+        snapshot, parameters, Degrees.zero());
+
+    var reSolved = shotWith(kTurretPosition, heading, new ChassisVelocities());
+
+    assertEquals(0.0, reSolved.targetTurretAngle().in(Degrees), kEpsilonDegrees);
+  }
+
+  @Test
+  void chassisHeadingIsTheBoreBearingWhenTheTurretParksAtZero() {
+    var snapshot = new TurretSnapshot(kTurretPosition, Rotation2d.ZERO, new ChassisVelocities());
+    var parameters = kCompensating.calculateShot(snapshot, kTarget, ShotProfile.kScoring);
+
+    // Target is due +X and the chassis already faces it, so there is nothing to turn.
+    assertEquals(
+        0.0,
+        ShotCalculationUtil.chassisHeadingForTurretBore(snapshot, parameters, Degrees.zero())
+            .getMeasure().in(Degrees),
+        kEpsilonDegrees);
+  }
+
+  @Test
+  void chassisHeadingOffsetsByTheFixedTurretAngle() {
+    // A bore parked 30 degrees CCW of the chassis needs the chassis 30 degrees CW of the bearing to
+    // put the bore on it. This is what makes the parked angle safe to retune.
+    var snapshot = new TurretSnapshot(kTurretPosition, Rotation2d.ZERO, new ChassisVelocities());
+    var parameters = kCompensating.calculateShot(snapshot, kTarget, ShotProfile.kScoring);
+
+    assertEquals(
+        -30.0,
+        ShotCalculationUtil.chassisHeadingForTurretBore(snapshot, parameters, Degrees.of(30))
+            .getMeasure().in(Degrees),
+        kEpsilonDegrees);
+  }
+
+  @Test
+  void chassisHeadingLeadsAMovingShot() {
+    // Strafing in +Y leads the aim against the motion, exactly as the turret angle does -- the
+    // chassis inherits the compensation rather than recomputing a stationary bearing.
+    var snapshot = new TurretSnapshot(
+        kTurretPosition, Rotation2d.ZERO, new ChassisVelocities(0.0, 2.0, 0.0));
+    var parameters = kCompensating.calculateShot(snapshot, kTarget, ShotProfile.kScoring);
+
+    var heading = ShotCalculationUtil.chassisHeadingForTurretBore(
+        snapshot, parameters, Degrees.zero());
+
+    assertTrue(
+        heading.getMeasure().in(Degrees) < -kEpsilonDegrees,
+        "strafing in +Y should turn the commanded chassis heading negative, got "
+            + heading.getMeasure().in(Degrees));
+  }
 }

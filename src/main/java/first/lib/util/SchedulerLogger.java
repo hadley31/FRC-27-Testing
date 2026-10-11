@@ -1,4 +1,4 @@
-package first.robot.util;
+package first.lib.util;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,8 +16,6 @@ import org.wpilib.command3.Command;
 import org.wpilib.command3.Mechanism;
 import org.wpilib.command3.Scheduler;
 import org.wpilib.command3.SchedulerEvent;
-
-import first.lib.util.LoggedTracer;
 
 /**
  * Logs command scheduler telemetry through AdvantageKit, so it lands in the log file and is

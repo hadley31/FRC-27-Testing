@@ -1,7 +1,5 @@
 package first.lib.mechanism;
 
-import first.lib.tuning.TuningState;
-
 import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.inputs.LoggableInputs;
@@ -9,7 +7,13 @@ import org.wpilib.command3.Command;
 import org.wpilib.command3.Mechanism;
 import org.wpilib.command3.NeedsNameBuilderStage;
 import org.wpilib.command3.Trigger;
+import org.wpilib.tunable.Tunables;
 import org.wpilib.units.Measure;
+
+import first.lib.tuning.TunableCommand;
+import first.lib.tuning.TuningState;
+import first.lib.tuning.TuningStateCache;
+import first.lib.util.UnitDoubleConverter;
 
 public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInputs, U extends Measure<?>>
     extends Mechanism, LoggedComponent<T, I> {
@@ -114,8 +118,9 @@ public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInput
   public U getDefaultTolerance();
 
   public default Command tuningCommand() {
+    TuningState<U> tuning = getTuningState();
+
     return run(coroutine -> {
-      TuningState<U> tuning = getTuningState();
       setTarget(tuning.setpoint());
 
       while (true) {
@@ -129,5 +134,37 @@ public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInput
     }).named("Tune %s".formatted(getName()));
   }
 
-  public TuningState<U> getTuningState();
+  /**
+   * The unit this mechanism's measurements are tuned in: whatever a person wants to read and type on
+   * a dashboard, which is not necessarily the unit the inputs are logged in.
+   *
+   * <p>Supplied by the unit-specialized interfaces -- {@code AngleMechanism} and friends -- alongside
+   * the default tolerance, since both are properties of the dimension rather than of the mechanism.
+   */
+  public UnitDoubleConverter<U> getMeasureType();
+
+  /**
+   * This mechanism's published setpoint and gains.
+   *
+   * <p>Created on first call and cached per mechanism; see {@link TuningStateCache} for why that
+   * matters.
+   */
+  public default TuningState<U> getTuningState() {
+    return TuningStateCache.getOrCreate(this, getMeasureType());
+  }
+
+  /**
+   * Publishes this mechanism's {@link #tuningCommand()} as a dashboard button, at {@code
+   * Tuning/Commands/<mechanism name>} -- so every mechanism's button sits together in one place, under the
+   * same word as the setpoint and gains the button exists to exercise.
+   *
+   * <p>Call this from the mechanism's constructor. It replaces the commands v2 {@code
+   * SmartDashboard.putData} that a command could once be handed to directly; see {@link
+   * TunableCommand} for why the binding has to be written out in v3.
+   */
+  public default void registerTuningCommand() {
+    Tunables.publish(
+        "Tuning/Commands/%s".formatted(getName()),
+        new TunableCommand(tuningCommand(), getRegisteredScheduler()));
+  }
 }

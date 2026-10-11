@@ -15,6 +15,20 @@ import org.wpilib.units.measure.Angle;
 import choreo.util.ChoreoAllianceFlipUtil.Flipper;
 
 public class GeometryUtil {
+  /**
+   * The direction from one point to another.
+   *
+   * <p>Two coincident points have no direction between them, and {@code fallback} is what a caller
+   * steering by this bearing wants in that case: its own current heading, so the error comes out
+   * zero and it holds still rather than snapping to an arbitrary direction as the vector through the
+   * target flips about underneath it.
+   *
+   * @param fallback returned when {@code from} and {@code to} are the same point
+   */
+  public static Rotation2d bearing(Translation2d from, Translation2d to, Rotation2d fallback) {
+    return to.minus(from).getAngle().orElse(fallback);
+  }
+
   public static Rotation3d rotation3dFromYaw(Angle angle) {
     return new Rotation3d(Degrees.zero(), Degrees.zero(), angle);
   }

@@ -54,12 +54,27 @@ public final class Tuning {
 
   // MARK: - Turret
 
-  /** Whether the turret tracks the hub on its own. */
+  /**
+   * Whether the turret tracks the hub on its own, whenever no command has claimed it.
+   *
+   * <p>Read inside the turret's default command rather than gating it, so it can be flipped at any
+   * time -- see {@code RobotCommandFactory#trackHubWithTurret}. With it off the turret simply holds
+   * position when idle. Either way an explicit command, such as auto-aim, takes the turret and the
+   * toggle has no say until that command ends.
+   */
   public static final Toggle kAutoAim = Toggle.of("/Tuning/Turret/AutoAim", false);
 
   /**
-   * Whether the turret holds a fixed angle. Orthogonal to {@link #kAutoAim}: with both set, the
-   * chassis does the aiming instead of the turret.
+   * Whether the turret parks at a fixed angle and the <em>chassis</em> does the aiming instead.
+   *
+   * <p>The shot solution is unchanged; only which joint executes it differs. The chassis heading is
+   * read out of the same solve the turret would have used, by
+   * {@code ShotCalculationUtil#chassisHeadingForTurretBore}, so the chassis inherits the turret
+   * offset and velocity lead rather than aiming by a cruder rule.
+   *
+   * <p>Safe to flip mid-match: auto-aim picks the chassis up on the rising edge and gives it back on
+   * the falling one. Expect a longer time-to-shot while it is set, since a loaded chassis turns a
+   * good deal slower than a turret.
    */
   public static final Toggle kFixedTurretMode = Toggle.of("/Tuning/Turret/FixedTurretMode", false);
 

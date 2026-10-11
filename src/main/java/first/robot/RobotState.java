@@ -315,8 +315,4 @@ public class RobotState {
   public boolean isAutoAimEnabled() {
     return Tuning.kAutoAim.getAsBoolean();
   }
-
-  public boolean isAutoAimAndFixedTurretModeEnabled() {
-    return isAutoAimEnabled() && isFixedTurretModeEnabled();
-  }
 }

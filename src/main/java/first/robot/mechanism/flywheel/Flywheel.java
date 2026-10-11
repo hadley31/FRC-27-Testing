@@ -1,13 +1,8 @@
 package first.robot.mechanism.flywheel;
 
-import static org.wpilib.units.Units.RPM;
-
-import org.wpilib.units.measure.AngularVelocity;
-
-import first.lib.tuning.TuningState;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanism;
-import first.lib.mechanism.angularvelocity.AngularVelocityMechanismInputsAutoLogged;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismIO;
+import first.lib.mechanism.angularvelocity.AngularVelocityMechanismInputsAutoLogged;
 
 public class Flywheel implements AngularVelocityMechanism<AngularVelocityMechanismIO> {
   private final AngularVelocityMechanismIO m_io;
@@ -15,6 +10,8 @@ public class Flywheel implements AngularVelocityMechanism<AngularVelocityMechani
 
   public Flywheel(AngularVelocityMechanismIO io) {
     m_io = io;
+    getRegisteredScheduler().addPeriodic(this::update);
+    registerTuningCommand();
   }
 
   @Override
@@ -25,10 +22,5 @@ public class Flywheel implements AngularVelocityMechanism<AngularVelocityMechani
   @Override
   public AngularVelocityMechanismInputsAutoLogged getInputs() {
     return m_inputs;
-  }
-
-  @Override
-  public TuningState<AngularVelocity> getTuningState() {
-    return new TuningState<>(getName(), RPM::of);
   }
 }

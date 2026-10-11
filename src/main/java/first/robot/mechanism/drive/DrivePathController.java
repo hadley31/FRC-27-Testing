@@ -25,11 +25,13 @@ public class DrivePathController {
       BiConsumer<ChassisVelocities, Translation2d[]> velocitiesConsumer) {
     m_poseSupplier = poseSupplier;
     m_velocitiesConsumer = velocitiesConsumer;
+
+    // A property of the controller, not of any one sample, so it is set once here rather than on
+    // every call.
+    m_pathThetaController.enableContinuousInput(-Math.PI, Math.PI);
   }
 
   public void followSample(SwerveSample sample) {
-    m_pathThetaController.enableContinuousInput(-Math.PI, Math.PI);
-
     var pose = m_poseSupplier.get();
     var targetPose = sample.getPose();
 

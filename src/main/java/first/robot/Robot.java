@@ -30,6 +30,7 @@ import first.lib.mechanism.angle.TalonFXAngleMechanismIO;
 import first.lib.mechanism.angularvelocity.TalonFXAngularVelocityMechanismIO;
 import first.lib.tuning.Toggle;
 import first.lib.util.LoggedTracer;
+import first.lib.util.SchedulerLogger;
 import first.robot.mechanism.drive.Drive;
 import first.robot.mechanism.drive.GyroIO;
 import first.robot.mechanism.drive.GyroIOPigeon2;
@@ -40,6 +41,8 @@ import first.robot.mechanism.drive.TunerConstants;
 import first.robot.mechanism.feeder.Feeder;
 import first.robot.mechanism.flywheel.Flywheel;
 import first.robot.mechanism.hood.Hood;
+import first.robot.mechanism.intake.IntakePivot;
+import first.robot.mechanism.intake.IntakeRollers;
 import first.robot.mechanism.turret.Turret;
 import first.robot.mechanism.vision.apriltag.AprilTagCameraIOReplay;
 import first.robot.mechanism.vision.apriltag.AprilTagVision;
@@ -53,7 +56,6 @@ import first.robot.util.Constants;
 import first.robot.util.Constants.RobotModeConstants.Mode;
 import first.robot.util.Constants.VisionConstants;
 import first.robot.util.PoseEstimator;
-import first.robot.util.SchedulerLogger;
 import first.robot.util.Tuning;
 
 /**
@@ -72,6 +74,8 @@ public class Robot extends LoggedRobot {
   public final Turret turret;
   public final Hood hood;
   public final Feeder feeder;
+  public final IntakePivot intakePivot;
+  public final IntakeRollers intakeRollers;
   public final AprilTagVision vision;
   public final RobotState state;
 
@@ -90,6 +94,8 @@ public class Robot extends LoggedRobot {
     turret = new Turret(new TalonFXAngleMechanismIO(1, CAN_BUS));
     hood = new Hood(new TalonFXAngleMechanismIO(2, CAN_BUS));
     feeder = new Feeder(new TalonFXAngularVelocityMechanismIO(3, CAN_BUS));
+    intakePivot = new IntakePivot(new TalonFXAngleMechanismIO(4, CAN_BUS));
+    intakeRollers = new IntakeRollers(new TalonFXAngularVelocityMechanismIO(5, CAN_BUS));
 
     var poseEstimator = new PoseEstimator(drive.getKinematics(), Tuning.kOdometryTiltCompensation, Tuning.kWallClamp);
 
@@ -108,6 +114,7 @@ public class Robot extends LoggedRobot {
         .createVision(VisionConstants.kCameras);
 
     state = new RobotState(drive, turret, hood, flywheel, vision, poseEstimator, field);
+    var geometryViz = new RobotGeometryViz(state, intakePivot);
 
     var teleopFactory = new CompetitionTeleopFactory(this);
     var autoFactory = new CompetitionAutoFactory(this);
@@ -118,6 +125,10 @@ public class Robot extends LoggedRobot {
 
     Scheduler.getDefault().addPeriodic(Toggle::logNonDefaults);
     Scheduler.getDefault().addPeriodic(state::periodic);
+
+    // After state::periodic, so the model is drawn from the pose estimate this loop produced
+    // rather than the previous one's.
+    Scheduler.getDefault().addPeriodic(geometryViz::periodic);
   }
 
   /**

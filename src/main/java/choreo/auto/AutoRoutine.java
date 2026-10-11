@@ -279,6 +279,10 @@ public class AutoRoutine {
     return cmd(() -> false);
   }
 
+  public String getName() {
+    return name;
+  }
+
   /**
    * Creates a command that will poll this event loop and reset it when it is finished or canceled.
    *

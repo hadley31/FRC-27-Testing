@@ -15,7 +15,10 @@ import choreo.auto.AutoRoutine;
 import choreo.auto.AutoTrajectory;
 import first.robot.Robot;
 import first.robot.command.RobotCommandFactory;
+import first.robot.mechanism.drive.DriveHeadingController;
 import first.robot.mechanism.drive.DrivePathController;
+import first.robot.util.Constants;
+import first.robot.util.SwerveInputStream;
 
 /**
  * Every autonomous routine the robot can run, sharing one {@link AutoFactory}.
@@ -33,7 +36,13 @@ public class CompetitionAutoFactory {
 
   public CompetitionAutoFactory(Robot robot) {
     m_robot = robot;
-    m_commands = new RobotCommandFactory(robot);
+
+    // A stream with no sticks behind it: in auto there is no driver to blend translation with, so a
+    // command that aims the chassis rotates in place.
+    m_commands = new RobotCommandFactory(robot, SwerveInputStream.of(
+        robot.state::getRobotPose,
+        new DriveHeadingController(
+            Constants.DriveConstants.kMaxAngularVelocity, "SwerveInputStream/Auto")));
 
     DrivePathController pathController = new DrivePathController(robot.state::getRobotPose, robot.drive::drive);
 
@@ -63,7 +72,7 @@ public class CompetitionAutoFactory {
   public AutoChooser createAutoChooser() {
     AutoChooser chooser = new AutoChooser();
 
-    chooser.addRoutine("Two Piece", this::twoPiece);
+    chooser.addRoutine("Left Side Two Pass", this::leftSideTwoPass);
 
     Tunables.publish("Choosers/Auto", chooser);
 
@@ -75,16 +84,27 @@ public class CompetitionAutoFactory {
    *
    * @return a newly built routine.
    */
-  public AutoRoutine twoPiece() {
-    AutoRoutine routine = m_factory.newRoutine("Two Piece Auto");
-    AutoTrajectory grabSecondPiece = routine.trajectory("TwoPieceAuto");
+  public AutoRoutine leftSideTwoPass() {
+    AutoRoutine routine = m_factory.newRoutine("Left Trench Two Pass");
+    AutoTrajectory leftTrenchFuelBumpShoot = routine.trajectory("LeftTrenchFuelBumpShoot");
+    AutoTrajectory leftBumpShootToLeftStartTrench = routine.trajectory("LeftBumpShootToLeftStartTrench");
+    AutoTrajectory leftTrenchFuelBumpShootSecondPass = routine.trajectory("LeftTrenchFuelBumpShootSecondPass");
+
+    Command shootCommand = m_commands.autoAimAndShoot().withTimeout(Seconds.of(5));
+
+    leftTrenchFuelBumpShoot.active().onTrue(m_commands.intakeFuel());
+    leftTrenchFuelBumpShootSecondPass.active().onTrue(m_commands.intakeFuel());
+    leftBumpShootToLeftStartTrench.active().onTrue(m_commands.stowAllMechanisms());
 
     routine.active().onTrue(
         Command.noRequirements(coroutine -> {
-          coroutine.await(grabSecondPiece.resetOdometry());
-          coroutine.await(m_commands.autoAimAndShoot().withTimeout(Seconds.of(1.5)));
-          coroutine.await(grabSecondPiece.cmd());
-          coroutine.await(m_commands.autoAimAndShoot());
+          coroutine.await(leftTrenchFuelBumpShoot.resetOdometry());
+          coroutine.await(leftTrenchFuelBumpShoot.cmd());
+          coroutine.await(shootCommand);
+          coroutine.await(leftBumpShootToLeftStartTrench.cmd());
+          coroutine.await(leftTrenchFuelBumpShootSecondPass.cmd());
+          coroutine.await(shootCommand);
+          coroutine.await(leftBumpShootToLeftStartTrench.cmd());
         }).named("Two Piece Auto Sequence"));
 
     return routine;

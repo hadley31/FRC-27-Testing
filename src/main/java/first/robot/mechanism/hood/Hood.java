@@ -1,13 +1,8 @@
 package first.robot.mechanism.hood;
 
-import static org.wpilib.units.Units.Degrees;
-
-import org.wpilib.units.measure.Angle;
-
-import first.lib.tuning.TuningState;
 import first.lib.mechanism.angle.AngleMechanism;
-import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 import first.lib.mechanism.angle.AngleMechanismIO;
+import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 
 public class Hood implements AngleMechanism<AngleMechanismIO> {
   private final AngleMechanismIO m_io;
@@ -15,6 +10,8 @@ public class Hood implements AngleMechanism<AngleMechanismIO> {
 
   public Hood(AngleMechanismIO io) {
     m_io = io;
+    getRegisteredScheduler().addPeriodic(this::update);
+    registerTuningCommand();
   }
 
   @Override
@@ -25,10 +22,5 @@ public class Hood implements AngleMechanism<AngleMechanismIO> {
   @Override
   public AngleMechanismInputsAutoLogged getInputs() {
     return m_inputs;
-  }
-
-  @Override
-  public TuningState<Angle> getTuningState() {
-    return new TuningState<>(getName(), Degrees::of);
   }
 }

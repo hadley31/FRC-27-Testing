@@ -126,6 +126,43 @@ public final class ShotCalculationUtil {
   }
 
   /**
+   * The chassis heading that puts the turret bore on a solved shot's aim point, with the turret
+   * parked at {@code fixedTurretAngle}.
+   *
+   * <p>The inverse of {@link #calculateTargetTurretAngle}, and here beside it because the two share
+   * one convention: a turret setpoint is measured in the chassis frame, so adding the chassis heading
+   * back recovers the field bearing the solve actually chose. Pointing a bore that sits
+   * {@code fixedTurretAngle} off the chassis along that bearing means turning the chassis to the
+   * difference.
+   *
+   * <p>Aiming this way rather than computing a fresh bearing to the target is what buys the chassis
+   * every correction the turret already gets: the aim point is the velocity-compensated virtual
+   * target, and the bearing was taken from the turret pivot rather than the robot's centre. A chassis
+   * aim that recomputed its own bearing would be a second, worse answer to a question
+   * {@link #calculateShot} has already answered.
+   *
+   * <p>One caveat: this is a fixed point rather than a closed-form solution, because rotating the
+   * chassis sweeps the pivot, which moves the bearing. The perturbation is bounded by
+   * {@code |r| / R} -- the mount offset over the range, about 0.07 at 3 m with
+   * {@code kRobotToTurret} -- so a heading controller chasing this converges in a few cycles. It only
+   * approaches unity when {@code R} nears the mount offset itself, which is a robot parked on top of
+   * the thing it is shooting at.
+   *
+   * @param turret            the snapshot the shot was solved from, for the chassis heading it was
+   *                          solved against. Passing a different one than {@code shot} came from
+   *                          mixes two instants and silently biases the heading.
+   * @param shot              that solve's parameters
+   * @param fixedTurretAngle  where the turret is held while the chassis aims. Zero puts the bore down
+   *                          the chassis +X axis, making the answer the bore bearing itself.
+   */
+  public static Rotation2d chassisHeadingForTurretBore(
+      TurretSnapshot turret, ShotParameters shot, Angle fixedTurretAngle) {
+    return turret.robotRotation()
+        .plus(new Rotation2d(shot.targetTurretAngle()))
+        .minus(new Rotation2d(fixedTurretAngle));
+  }
+
+  /**
    * Converts a field-relative turret-to-target bearing into the robot-relative angle the turret
    * mechanism is commanded with.
    */

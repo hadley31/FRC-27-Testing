@@ -30,12 +30,22 @@ public class CompetitionDriverControls implements DriverControls {
   }
 
   @Override
+  public Trigger setModeToStow() {
+    return m_controller.leftBumper();
+  }
+
+  @Override
+  public Trigger setModeToIntake() {
+    return m_controller.leftTrigger();
+  }
+
+  @Override
   public Trigger setModeToScore() {
     return m_controller.rightBumper();
   }
 
   @Override
-  public Trigger setModeToStow() {
-    return m_controller.leftBumper();
+  public Trigger toggleFixedTurretMode() {
+    return m_controller.view();
   }
 }

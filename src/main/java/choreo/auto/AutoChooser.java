@@ -167,6 +167,44 @@ public class AutoChooser implements ComplexTunable {
   }
 
   /**
+   * Add an AutoRoutine to the chooser.
+   *
+   * <p>This is done to load AutoRoutines when and only when they are selected, in order to save
+   * memory and file loading time for unused AutoRoutines.
+   *
+   * <p>The generators are only run when the DriverStation is disabled and the alliance is known.
+   *
+   * <p>One way to keep this clean is to make an `Autos` class that all of your subsystems/resources
+   * are <a href="https://en.wikipedia.org/wiki/Dependency_injection">dependency injected</a> into.
+   * Then create methods inside that class that take an {@link AutoFactory} and return an {@link
+   * AutoRoutine}.
+   *
+   * <h3>Example:</h3>
+   *
+   * <pre><code>
+   * AutoChooser chooser;
+   * Autos autos = new Autos(swerve, shooter, intake, feeder);
+   * public Robot() {
+   *   chooser = new AutoChooser("/Choosers");
+   *   Tunables.publish("Choosers/Auto", chooser);
+   *   // fourPieceRight is a method that accepts an AutoFactory and returns an AutoRoutine.
+   *   chooser.addRoutine("4 Piece right", autos::fourPieceRight);
+   *   chooser.addRoutine("4 Piece Left", autos::fourPieceLeft);
+   *   chooser.addRoutine("3 Piece Close", autos::threePieceClose);
+   * }
+   * </code></pre>
+   *
+   * @param name The name of the auto routine.
+   * @param routine The auto routine.
+   * @return This {@link AutoChooser} instance, to allow for method chaining.
+   */
+  public AutoChooser addRoutine(AutoRoutine routine) {
+    autoRoutines.put(routine.getName(), () -> routine.cmd());
+    options = autoRoutines.keySet().toArray(new String[0]);
+    return this;
+  }
+
+  /**
    * Adds a Command to the auto chooser.
    *
    * <p>This is done to load autonomous commands when and only when they are selected, in order to
