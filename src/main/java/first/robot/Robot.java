@@ -11,13 +11,12 @@ import java.net.UnknownHostException;
 import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.LogFileUtil;
-import org.littletonrobotics.junction.LoggedRobot;
+import org.littletonrobotics.junction.LoggedOpModeRobot;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 import org.wpilib.command3.Scheduler;
-import org.wpilib.command3.button.RobotModeTriggers;
 import org.wpilib.fields.Field;
 import org.wpilib.fields.Fields;
 import org.wpilib.math.geometry.Pose2d;
@@ -50,8 +49,8 @@ import first.robot.mechanism.vision.apriltag.AprilTagVisionFactory;
 import first.robot.mechanism.vision.apriltag.AprilTagVisionFactoryPhotonVision;
 import first.robot.mechanism.vision.apriltag.AprilTagVisionFactoryPhotonVisionSim;
 import first.robot.mechanism.vision.apriltag.RobotHeadingSource;
-import first.robot.mode.CompetitionAutoFactory;
-import first.robot.mode.CompetitionTeleopFactory;
+import first.robot.mode.CompetitionAutoMode;
+import first.robot.mode.CompetitionTeleopMode;
 import first.robot.util.Constants;
 import first.robot.util.Constants.RobotModeConstants.Mode;
 import first.robot.util.Constants.VisionConstants;
@@ -59,16 +58,19 @@ import first.robot.util.PoseEstimator;
 import first.robot.util.Tuning;
 
 /**
- * A plain {@link LoggedRobot}: AdvantageKit drives the main loop through
- * {@code IterativeRobotBase}, and the robot modes come from the driver station rather than from
- * selected opmodes.
+ * A {@link LoggedOpModeRobot}: AdvantageKit drives the main loop, and what the robot does in a
+ * given mode comes from an opmode the driver station selects by name. The two it can pick are
+ * {@link CompetitionAutoMode} and {@link CompetitionTeleopMode}, which the base class finds for
+ * itself by scanning this package and its subpackages for the annotations they carry.
  *
- * <p>Commands v3 supports this arrangement directly. Bindings made here in the constructor (while
- * the robot is disabled and no opmode is selected) land in the scheduler's global binding scope, and
- * bindings made from {@link #autonomousInit()} or {@link #teleopInit()} land in a robot-mode scope
- * that the scheduler drops on its own when the mode ends.
+ * <p>What is left here is what outlives any one of them: the mechanisms, the pose estimate, and the
+ * periodic callbacks below. Bindings made in this constructor (while the robot is disabled and no
+ * opmode is selected) land in the scheduler's global binding scope, whereas anything an opmode
+ * binds is scoped to that opmode and dropped when another one is selected. That is the reason the
+ * driver controls and the auto routines sit in the opmodes rather than here: selecting a different
+ * mode on the driver station takes their bindings with it.
  */
-public class Robot extends LoggedRobot {
+public class Robot extends LoggedOpModeRobot {
   public final Drive drive;
   public final Flywheel flywheel;
   public final Turret turret;
@@ -115,13 +117,6 @@ public class Robot extends LoggedRobot {
 
     state = new RobotState(drive, turret, hood, flywheel, vision, poseEstimator, field);
     var geometryViz = new RobotGeometryViz(state, intakePivot);
-
-    var teleopFactory = new CompetitionTeleopFactory(this);
-    var autoFactory = new CompetitionAutoFactory(this);
-    var autoChooser = autoFactory.createAutoChooser();
-
-    RobotModeTriggers.autonomous().whileTrue(autoChooser.selectedCommandScheduler());
-    RobotModeTriggers.teleop().whileTrue(teleopFactory.getTeleopCommand());
 
     Scheduler.getDefault().addPeriodic(Toggle::logNonDefaults);
     Scheduler.getDefault().addPeriodic(state::periodic);

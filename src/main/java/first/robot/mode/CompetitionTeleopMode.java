@@ -1,7 +1,10 @@
 package first.robot.mode;
 
 import org.wpilib.command3.Command;
+import org.wpilib.command3.Scheduler;
 import org.wpilib.command3.StateMachine;
+import org.wpilib.opmode.PeriodicOpMode;
+import org.wpilib.opmode.Teleop;
 
 import first.robot.Robot;
 import first.robot.command.RobotCommandFactory;
@@ -14,17 +17,28 @@ import first.robot.util.SwerveInputStream;
  * The teleoperated driver experience: controller bindings, the drive default command, and the state
  * machine that moves the robot between superstructure modes.
  *
- * <p>Constructed once from {@link Robot}'s constructor, which is where the default command belongs
- * so that it is registered in commands v3's global binding scope rather than a per-mode one. The
- * state machine itself is handed back through {@link #getTeleopCommand()} and scheduled by
- * {@link Robot#teleopInit()}, so it only runs while the robot is in teleop.
+ * <p>Constructed by the framework when the driver station selects this opmode, which is also when
+ * the default commands below are registered: everything an opmode wires up is scoped to that
+ * opmode, so the scheduler drops it on its own once another opmode is selected.
+ *
+ * <p>The one thing that scope does not cover is a re-run. The framework closes an opmode when the
+ * robot disables and immediately builds a fresh instance under the <i>same</i> opmode id, so a
+ * binding made from this constructor is still live when the next instance makes its own. Default
+ * commands survive that -- the newest binding for a mechanism wins and the scheduler cancels the
+ * rest -- but a second {@code onTrue} on the same button would fire twice, which for a toggle means
+ * not at all. So the button bindings are made from inside {@link #m_teleopCommand} instead, where
+ * they are scoped to that command's run and dropped with it.
  */
-public class CompetitionTeleopFactory {
+@Teleop(name = "Competition")
+public class CompetitionTeleopMode extends PeriodicOpMode {
+  private final Robot m_robot;
   private final CompetitionDriverControls m_driverControls;
   private final RobotCommandFactory m_robotCommands;
   private final StateMachine m_stateMachine;
+  private final Command m_teleopCommand;
 
-  public CompetitionTeleopFactory(Robot robot) {
+  public CompetitionTeleopMode(Robot robot) {
+    m_robot = robot;
     m_driverControls = new CompetitionDriverControls(0);
 
     SwerveInputStream swerveInputStream = SwerveInputStream.of(
@@ -50,24 +64,45 @@ public class CompetitionTeleopFactory {
     robot.hood.setDefaultCommand(m_robotCommands.stowHood());
     robot.flywheel.setDefaultCommand(m_robotCommands.haltFlywheel());
 
-    // A toggle rather than a hold: switching which joint aims is a decision about the rest of the
-    // match, not something to keep a thumb on. Auto-aim reads it every cycle, so it takes effect
-    // whether or not the robot is currently shooting.
-    m_driverControls.toggleFixedTurretMode()
-        .onTrue(Command.noRequirements(
-            coroutine -> robot.state.setFixedTurretMode(!robot.state.isFixedTurretModeEnabled()))
-            .named("Toggle Fixed Turret Mode"));
-
     m_stateMachine = buildStateMachine();
+    m_teleopCommand = buildTeleopCommand();
+  }
+
+  /** Binds the driver's buttons and starts the state machine for the length of the enabled run. */
+  @Override
+  public void start() {
+    Scheduler.getDefault().schedule(m_teleopCommand);
   }
 
   /**
-   * Returns the command to run for the duration of teleop.
+   * Stops driving the robot.
    *
-   * @return the driver controls state machine.
+   * <p>The command outlives the opmode's scope -- the next instance is created under the same
+   * opmode id -- so it has to be cancelled by hand rather than left to the scheduler.
    */
-  public Command getTeleopCommand() {
-    return m_stateMachine;
+  @Override
+  public void end() {
+    Scheduler.getDefault().cancel(m_teleopCommand);
+  }
+
+  private Command buildTeleopCommand() {
+    return Command.noRequirements(coroutine -> {
+      // Bound from inside the command, so the binding is scoped to this run of teleop rather than
+      // to the opmode, and is gone by the time the next instance binds the same button.
+      //
+      // A toggle rather than a hold: switching which joint aims is a decision about the rest of the
+      // match, not something to keep a thumb on. Auto-aim reads it every cycle, so it takes effect
+      // whether or not the robot is currently shooting.
+      m_driverControls.toggleFixedTurretMode().onTrue(toggleFixedTurretMode());
+
+      coroutine.await(m_stateMachine);
+    }).named("Competition Teleop");
+  }
+
+  private Command toggleFixedTurretMode() {
+    return Command.noRequirements(
+        coroutine -> m_robot.state.setFixedTurretMode(!m_robot.state.isFixedTurretModeEnabled()))
+        .named("Toggle Fixed Turret Mode");
   }
 
   private StateMachine buildStateMachine() {
