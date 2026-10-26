@@ -28,7 +28,6 @@ import com.ctre.phoenix6.swerve.SwerveModuleConstants;
 import first.lib.mechanism.angle.TalonFXAngleMechanismIO;
 import first.lib.mechanism.angularvelocity.TalonFXAngularVelocityMechanismIO;
 import first.lib.tuning.LoggedTunables;
-import first.lib.tuning.Toggle;
 import first.lib.util.LoggedTracer;
 import first.lib.util.SchedulerLogger;
 import first.robot.mechanism.drive.Drive;
@@ -119,7 +118,6 @@ public class Robot extends LoggedOpModeRobot {
     state = new RobotState(drive, turret, hood, flywheel, vision, poseEstimator, field);
     var geometryViz = new RobotGeometryViz(state, intakePivot);
 
-    Scheduler.getDefault().addPeriodic(Toggle::logNonDefaults);
     Scheduler.getDefault().addPeriodic(LoggedTunables::refresh);
     Scheduler.getDefault().addPeriodic(state::periodic);
 

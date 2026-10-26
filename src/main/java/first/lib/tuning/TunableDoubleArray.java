@@ -17,8 +17,8 @@ import org.wpilib.networktables.NetworkTableInstance;
  * <p>AdvantageKit ships {@code LoggedNetworkNumber}, {@code LoggedNetworkBoolean} and {@code
  * LoggedNetworkString} but no array type, so this fills the gap the same way they do: the value is
  * logged as an <em>input</em>, which is what makes a log replay against the table the robot actually
- * used rather than against whatever the code's default happened to be. {@link Toggle} spells out that
- * argument, and it matters more here — a shot table read as its default during replay produces
+ * used rather than against whatever the code's default happened to be. {@link LoggedTunable} spells
+ * out that argument, and it matters more here — a shot table read as its default during replay produces
  * plausible-looking but wrong solutions rather than an obvious failure.
  *
  * <h2>Length is part of the value</h2>
@@ -88,8 +88,8 @@ public final class TunableDoubleArray extends LoggedNetworkInput implements Supp
   /**
    * An array whose value is saved on the robot and restored at boot.
    *
-   * <p>Unlike a behaviour switch, measured data is exactly what {@link Toggle}'s notes say persistence
-   * is for: values you would be annoyed to re-enter. The hazard is different rather than absent
+   * <p>Unlike a behaviour switch, measured data is exactly what {@link LoggedTunable}'s notes say
+   * persistence is for: values you would be annoyed to re-enter. The hazard is different rather than absent
    * though — a persisted table is invisible until someone looks at it, so whatever owns the array is
    * responsible for publishing whether it still matches the code default.
    *

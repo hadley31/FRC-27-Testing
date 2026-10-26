@@ -16,13 +16,24 @@ import org.wpilib.networktables.NetworkTableInstance;
  */
 public final class LoggedTunableDouble extends LoggedTunable<Double> implements DoubleSupplier {
   /**
-   * A tuned number that AdvantageKit refreshes once per loop.
+   * A tuned number that resets to its default every boot.
    *
    * @param path absolute NT path, e.g. {@code "/Tuning/Flywheel/SpinupFactor"}
-   * @param codeDefault the value committed in code, used until something is stored on the robot
+   * @param codeDefault the value a robot with no dashboard should use
    */
   public static LoggedTunableDouble of(String path, double codeDefault) {
-    return new LoggedTunableDouble(path, codeDefault, true);
+    return new LoggedTunableDouble(path, codeDefault, false, true);
+  }
+
+  /**
+   * A tuned number the robot saves and restores at boot. See {@link LoggedTunable} on which to
+   * reach for: measured numbers persist, behaviour switches do not.
+   *
+   * @param path absolute NT path
+   * @param codeDefault the value used until something is stored on the robot
+   */
+  public static LoggedTunableDouble persistent(String path, double codeDefault) {
+    return new LoggedTunableDouble(path, codeDefault, true, true);
   }
 
   /**
@@ -33,14 +44,16 @@ public final class LoggedTunableDouble extends LoggedTunable<Double> implements 
    * {@link TunableDoubleArray#owned(String, double[], boolean)} for the full argument.
    *
    * @param path absolute NT path
-   * @param codeDefault the value committed in code
+   * @param codeDefault the value used until something is stored on the robot
+   * @param persistent whether the robot saves the value across a reboot
    */
-  public static LoggedTunableDouble owned(String path, double codeDefault) {
-    return new LoggedTunableDouble(path, codeDefault, false);
+  public static LoggedTunableDouble owned(String path, double codeDefault, boolean persistent) {
+    return new LoggedTunableDouble(path, codeDefault, persistent, false);
   }
 
-  private LoggedTunableDouble(String path, double codeDefault, boolean register) {
-    super(path, codeDefault, new Codec(), register);
+  private LoggedTunableDouble(
+      String path, double codeDefault, boolean persistent, boolean register) {
+    super(path, codeDefault, new Codec(), persistent, register);
   }
 
   @Override
@@ -52,11 +65,14 @@ public final class LoggedTunableDouble extends LoggedTunable<Double> implements 
     private DoubleEntry m_entry;
 
     @Override
-    public void bind(String path, Double codeDefault) {
+    public void bind(String path, Double codeDefault, boolean persistent) {
       var topic = NetworkTableInstance.getDefault().getDoubleTopic(path);
       m_entry = topic.getEntry(codeDefault);
       m_entry.setDefault(codeDefault);
-      topic.setPersistent(true);
+
+      if (persistent) {
+        topic.setPersistent(true);
+      }
     }
 
     @Override

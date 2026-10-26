@@ -106,7 +106,7 @@ public final class TunableShotProfile extends LoggedNetworkInput {
    * A profile whose table is saved on the robot and restored at boot, so a tuning session survives the
    * reboots between matches.
    *
-   * <p>This is what {@link first.lib.tuning.Toggle}'s notes mean by a value you would be annoyed to
+   * <p>This is what {@link first.lib.tuning.LoggedTunable}'s notes mean by a value you would be annoyed to
    * re-enter: measured data, not a behaviour switch. Watch {@code IsDefault}, and export the result into
    * source rather than treating the robot's {@code networktables.json} as where the tuning lives.
    */

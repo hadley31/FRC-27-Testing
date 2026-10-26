@@ -16,33 +16,48 @@ import org.littletonrobotics.junction.networktables.LoggedNetworkInput;
  * anything had together:
  *
  * <ul>
- *   <li><b>Persistent.</b> The topic is flagged persistent, so the robot's NT server saves it to
- *       {@code /home/systemcore/networktables.json} and reloads it at boot. A gain found at 4pm is
- *       still there after the next code deploy. {@code org.wpilib.tunable} values are not
- *       persistent, which is what made tuning with them a matter of scribbling numbers on paper.
+ *   <li><b>Optionally persistent.</b> {@link #isPersistent()} values are flagged so the robot's NT
+ *       server saves them to {@code /home/systemcore/networktables.json} and reloads them at boot,
+ *       so a gain found at 4pm is still there after the next code deploy. {@code org.wpilib.tunable}
+ *       values are never persistent, which is what made tuning with them a matter of scribbling
+ *       numbers on paper. See the note on which to reach for, below.
  *   <li><b>Cached.</b> {@link #get()} is a field read. The value is refreshed once per loop in
  *       {@link #periodic()}, before user code, so everything that reads it within one cycle sees
  *       the same number -- and reading it in a hot loop costs nothing.
  *   <li><b>Logged as an input.</b> This extends {@link LoggedNetworkInput}, so AdvantageKit records
  *       the value as an <em>input</em> and a replay runs the number the robot really ran rather than
- *       whatever the code default happens to be today. {@link Toggle} spells out that argument; it
- *       matters more here, because a persisted value is by definition one that may differ from the
- *       source you are reading.
+ *       whatever the code default happens to be today. That matters most for a persisted value,
+ *       which is by definition one that may differ from the source you are reading.
  * </ul>
+ *
+ * <h2>Persist a tuned value; do not persist a behaviour switch</h2>
+ *
+ * <p>A measured number -- a gain, an offset, a table -- is exactly what persistence is for: you
+ * would be annoyed to re-enter it, and a tuning session should survive the restarts between
+ * matches. Reach for {@code persistent}.
+ *
+ * <p>A <em>behaviour</em> switch is the opposite. A persisted kill switch from a Thursday debug
+ * session will quietly still be set at Saturday's event, and a robot with a wiped dashboard must
+ * still play a valid match. Reach for {@code of}, whose default is therefore the
+ * <em>competition</em> behaviour rather than merely a starting point.
  *
  * <h2>Defaults, and the alert</h2>
  *
- * <p>The default passed at the declaration site is the value committed in code. A value already
- * stored on the robot <em>wins</em> over it -- that is the point -- which means the running robot
- * can silently disagree with the source. {@link LoggedTunables#refresh()} raises one alert naming
- * every value in that state, so "this robot is still carrying Thursday evening's experiment" is
- * visible from the driver station rather than discovered mid-match.
+ * <p>The default passed at the declaration site is the value committed in code. A stored value
+ * <em>wins</em> over it -- that is the point of persisting -- which means the running robot can
+ * silently disagree with the source. {@link LoggedTunables#refresh()} raises one alert naming every
+ * <em>persistent</em> value in that state, so "this robot is still carrying Thursday evening's
+ * experiment" is visible from the driver station rather than discovered mid-match.
+ *
+ * <p>Non-persistent values are logged the same way but deliberately do not alert: one resets at
+ * boot, so it cannot outlive the session that set it, and a driver who flips a switch on purpose
+ * mid-match should not be nagged for it.
  *
  * <p>Tuned values belong back in source. Treat the alert as a to-do list, not a status line.
  *
  * <h2>Paths are absolute</h2>
  *
- * <p>Same rule as {@link Toggle} and {@link TunableDoubleArray}: the path names the NT topic
+ * <p>Same rule as {@link TunableDoubleArray}: the path names the NT topic
  * outright, and a relative one is rejected. Keep them under {@link LoggedTunables#kRoot} so
  * everything tunable on the robot sits in one subtree.
  *
@@ -76,6 +91,7 @@ public abstract sealed class LoggedTunable<T> extends LoggedNetworkInput
   private final String m_path;
   private final String m_logKey;
   private final T m_codeDefault;
+  private final boolean m_persistent;
   private final LoggedTunableCodec<T> m_codec;
 
   private T m_value;
@@ -86,9 +102,15 @@ public abstract sealed class LoggedTunable<T> extends LoggedNetworkInput
    * @param codeDefault the value committed in code
    * @param codec how this value type reaches NetworkTables and the log; built by the subclass's
    *     factory, so it is complete before this constructor runs
+   * @param persistent whether the robot saves this value across a reboot
    * @param register whether AdvantageKit drives {@link #periodic()}, or an owner does
    */
-  LoggedTunable(String path, T codeDefault, LoggedTunableCodec<T> codec, boolean register) {
+  LoggedTunable(
+      String path,
+      T codeDefault,
+      LoggedTunableCodec<T> codec,
+      boolean persistent,
+      boolean register) {
     if (!path.startsWith("/") || path.endsWith("/")) {
       throw new IllegalArgumentException(
           "A tunable path must be absolute and name a topic, got: '" + path + "'");
@@ -100,9 +122,10 @@ public abstract sealed class LoggedTunable<T> extends LoggedNetworkInput
     // would produce an empty-named level.
     m_logKey = removeSlash(path);
     m_codeDefault = Objects.requireNonNull(codeDefault, "codeDefault");
+    m_persistent = persistent;
     m_codec = codec;
 
-    codec.bind(path, codeDefault);
+    codec.bind(path, codeDefault, persistent);
     // In replay the first periodic() replaces this from the log; seeding from the topic anyway
     // keeps get() meaningful for anything that reads before then.
     m_value = codec.read(codeDefault);
@@ -147,6 +170,16 @@ public abstract sealed class LoggedTunable<T> extends LoggedNetworkInput
   /** The value committed in code, which a stored value overrides. */
   public final T codeDefault() {
     return m_codeDefault;
+  }
+
+  /**
+   * Whether the robot saves this value across a reboot.
+   *
+   * <p>Only persistent values contribute to {@link LoggedTunables}' alert, since only they can
+   * outlive the session that changed them.
+   */
+  public final boolean isPersistent() {
+    return m_persistent;
   }
 
   /** Whether the current value still matches the one committed in code. */

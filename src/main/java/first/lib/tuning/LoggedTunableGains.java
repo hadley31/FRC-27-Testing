@@ -32,13 +32,13 @@ public final class LoggedTunableGains {
    * @param codeDefaults the gains committed in code, used until something is stored on the robot
    */
   public LoggedTunableGains(String pathPrefix, Gains codeDefaults) {
-    m_kS = LoggedTunableDouble.owned(pathPrefix + "/kS", codeDefaults.kS());
-    m_kV = LoggedTunableDouble.owned(pathPrefix + "/kV", codeDefaults.kV());
-    m_kA = LoggedTunableDouble.owned(pathPrefix + "/kA", codeDefaults.kA());
-    m_kG = LoggedTunableDouble.owned(pathPrefix + "/kG", codeDefaults.kG());
-    m_kP = LoggedTunableDouble.owned(pathPrefix + "/kP", codeDefaults.kP());
-    m_kI = LoggedTunableDouble.owned(pathPrefix + "/kI", codeDefaults.kI());
-    m_kD = LoggedTunableDouble.owned(pathPrefix + "/kD", codeDefaults.kD());
+    m_kS = LoggedTunableDouble.owned(pathPrefix + "/kS", codeDefaults.kS(), true);
+    m_kV = LoggedTunableDouble.owned(pathPrefix + "/kV", codeDefaults.kV(), true);
+    m_kA = LoggedTunableDouble.owned(pathPrefix + "/kA", codeDefaults.kA(), true);
+    m_kG = LoggedTunableDouble.owned(pathPrefix + "/kG", codeDefaults.kG(), true);
+    m_kP = LoggedTunableDouble.owned(pathPrefix + "/kP", codeDefaults.kP(), true);
+    m_kI = LoggedTunableDouble.owned(pathPrefix + "/kI", codeDefaults.kI(), true);
+    m_kD = LoggedTunableDouble.owned(pathPrefix + "/kD", codeDefaults.kD(), true);
   }
 
   /** An untuned bundle, all gains zero. */

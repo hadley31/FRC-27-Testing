@@ -27,7 +27,7 @@ import org.littletonrobotics.junction.LogTable;
  */
 interface LoggedTunableCodec<T> {
   /**
-   * Opens the topic, seeds it without disturbing a stored value, and flags it persistent.
+   * Opens the topic, seeds it without disturbing a stored value, and flags it persistent if asked.
    *
    * <p>Implementations must do those three things <em>in that order</em>, and must seed with
    * {@code setDefault} rather than {@code set}:
@@ -45,8 +45,9 @@ interface LoggedTunableCodec<T> {
    *
    * @param path the absolute NT path
    * @param codeDefault the default committed in code
+   * @param persistent whether the robot saves this value across a reboot
    */
-  void bind(String path, T codeDefault);
+  void bind(String path, T codeDefault, boolean persistent);
 
   /**
    * Reads the current value off the topic.

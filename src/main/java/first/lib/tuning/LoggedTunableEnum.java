@@ -6,8 +6,8 @@ import org.wpilib.networktables.StringEntry;
 import org.wpilib.util.Alert;
 
 /**
- * A tuned choice from a fixed set, that survives a reboot. See {@link LoggedTunable} for what that
- * buys and what it costs.
+ * A tunable choice from a fixed set, that can survive a reboot. See {@link LoggedTunable} for the
+ * whole contract.
  *
  * <p>Stored as the constant's {@code name()}, so {@code networktables.json} stays readable and a
  * reordered enum cannot silently come back as the wrong constant -- it comes back as no constant at
@@ -16,7 +16,7 @@ import org.wpilib.util.Alert;
  *
  * <pre>
  * public static final LoggedTunableEnum&lt;ShotMode&gt; kShotMode =
- *     LoggedTunableEnum.of("/Tuning/Shot/Mode", ShotMode.AUTO);
+ *     LoggedTunableEnum.persistent("/Tuning/Shot/Mode", ShotMode.AUTO);
  * </pre>
  *
  * <h2>An unrecognised stored name gets its own alert</h2>
@@ -37,10 +37,20 @@ public final class LoggedTunableEnum<E extends Enum<E>> extends LoggedTunable<E>
    * A tuned choice that AdvantageKit refreshes once per loop.
    *
    * @param path absolute NT path, e.g. {@code "/Tuning/Shot/Mode"}
-   * @param codeDefault the constant committed in code, which also supplies the enum type
+   * @param codeDefault the constant a robot with no dashboard should use
    */
   public static <E extends Enum<E>> LoggedTunableEnum<E> of(String path, E codeDefault) {
-    return new LoggedTunableEnum<>(path, codeDefault, true);
+    return new LoggedTunableEnum<>(path, codeDefault, false, true);
+  }
+
+  /**
+   * A tuned choice the robot saves and restores at boot.
+   *
+   * @param path absolute NT path
+   * @param codeDefault the constant committed in code, which also supplies the enum type
+   */
+  public static <E extends Enum<E>> LoggedTunableEnum<E> persistent(String path, E codeDefault) {
+    return new LoggedTunableEnum<>(path, codeDefault, true, true);
   }
 
   /**
@@ -48,13 +58,16 @@ public final class LoggedTunableEnum<E extends Enum<E>> extends LoggedTunable<E>
    *
    * @param path absolute NT path
    * @param codeDefault the constant committed in code, which also supplies the enum type
+   * @param persistent whether the robot saves the value across a reboot
    */
-  public static <E extends Enum<E>> LoggedTunableEnum<E> owned(String path, E codeDefault) {
-    return new LoggedTunableEnum<>(path, codeDefault, false);
+  public static <E extends Enum<E>> LoggedTunableEnum<E> owned(
+      String path, E codeDefault, boolean persistent) {
+    return new LoggedTunableEnum<>(path, codeDefault, persistent, false);
   }
 
-  private LoggedTunableEnum(String path, E codeDefault, boolean register) {
-    super(path, codeDefault, new Codec<>(codeDefault.getDeclaringClass()), register);
+  private LoggedTunableEnum(String path, E codeDefault, boolean persistent, boolean register) {
+    super(
+        path, codeDefault, new Codec<>(codeDefault.getDeclaringClass()), persistent, register);
   }
 
   /**
@@ -80,12 +93,15 @@ public final class LoggedTunableEnum<E extends Enum<E>> extends LoggedTunable<E>
     }
 
     @Override
-    public void bind(String path, E codeDefault) {
+    public void bind(String path, E codeDefault, boolean persistent) {
       m_path = path;
       var topic = NetworkTableInstance.getDefault().getStringTopic(path);
       m_entry = topic.getEntry(codeDefault.name());
       m_entry.setDefault(codeDefault.name());
-      topic.setPersistent(true);
+
+      if (persistent) {
+        topic.setPersistent(true);
+      }
     }
 
     @Override

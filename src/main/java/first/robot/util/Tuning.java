@@ -1,6 +1,6 @@
 package first.robot.util;
 
-import first.lib.tuning.Toggle;
+import first.lib.tuning.LoggedTunableBoolean;
 
 /**
  * Every feature toggle and tunable table on the robot, and the behaviour each one defaults to in a
@@ -11,7 +11,7 @@ import first.lib.tuning.Toggle;
  * match. Nothing here should be read from inside a mechanism or an algorithm — see the conventions
  * below.
  *
- * <h2>Where toggles get read</h2>
+ * <h2>Where these get read</h2>
  *
  * <ul>
  *   <li><b>Robot-scoped classes</b> that already depend on this robot's configuration — {@code
@@ -21,16 +21,20 @@ import first.lib.tuning.Toggle;
  *       work this way, which is what keeps them unit-testable without NetworkTables.
  * </ul>
  *
- * <h2>Where persistent tuned values go</h2>
+ * <h2>Toggles versus tuned values</h2>
  *
- * <p>A toggle or a tunable table here resets to its committed default every boot. A value you
- * actually tune — a gain, a setpoint, an offset — belongs in a {@code LoggedTunable} instead: those
- * are persistent NT topics under {@code /Tuning}, so they survive a reboot, and
- * {@code LoggedTunables.refresh()} raises one driver-station alert naming every one that no longer
- * matches the code. Declare those here too, under their own section.
+ * <p>Everything below is a {@code LoggedTunableBoolean.of}, which resets to its committed default
+ * every boot — that default <em>is</em> the competition behaviour. A value you actually tune
+ * — a gain, a setpoint, an offset — wants the {@code persistent} factory of the matching
+ * {@code LoggedTunable} type instead, so it survives the restarts between matches.
+ * {@code LoggedTunables.refresh()} then raises one driver-station alert naming every persistent
+ * value that no longer matches the code. Declare those here too, under their own section.
  *
- * <p>A mechanism's gains and setpoint are already covered — {@code TuningState} claims them under the
- * mechanism's own name, so they need no declaration here.
+ * <p>Do not reach for {@code persistent} on a behaviour switch: a persisted kill switch from a
+ * Thursday debug session will quietly still be set at Saturday's event.
+ *
+ * <p>A mechanism's gains and setpoint are already covered — {@code TuningState} claims them under
+ * the mechanism's own name, so they need no declaration here.
  *
  * <p>Class initialization publishes the NT topics, so this class must first be touched from the
  * {@code Robot} constructor or later — by then {@code RobotBase} has started the NT server and
@@ -61,8 +65,8 @@ public final class Tuning {
    * Turning this off is the first thing to try when shots drift consistently to one side while
    * moving but land while stationary.
    */
-  public static final Toggle kVelocityCompensation =
-      Toggle.of("/Tuning/Shot/VelocityCompensation", true);
+  public static final LoggedTunableBoolean kVelocityCompensation =
+      LoggedTunableBoolean.of("/Tuning/Shot/VelocityCompensation", true);
 
   // MARK: - Turret
 
@@ -74,7 +78,8 @@ public final class Tuning {
    * position when idle. Either way an explicit command, such as auto-aim, takes the turret and the
    * toggle has no say until that command ends.
    */
-  public static final Toggle kAutoAim = Toggle.of("/Tuning/Turret/AutoAim", false);
+  public static final LoggedTunableBoolean kAutoAim =
+      LoggedTunableBoolean.of("/Tuning/Turret/AutoAim", false);
 
   /**
    * Whether the turret parks at a fixed angle and the <em>chassis</em> does the aiming instead.
@@ -88,7 +93,8 @@ public final class Tuning {
    * the falling one. Expect a longer time-to-shot while it is set, since a loaded chassis turns a
    * good deal slower than a turret.
    */
-  public static final Toggle kFixedTurretMode = Toggle.of("/Tuning/Turret/FixedTurretMode", false);
+  public static final LoggedTunableBoolean kFixedTurretMode =
+      LoggedTunableBoolean.of("/Tuning/Turret/FixedTurretMode", false);
 
   // MARK: - Vision
 
@@ -102,15 +108,15 @@ public final class Tuning {
    * drifting calibration or a mounting transform measured wrong shows up there first, since a
    * one-tag solve has no second tag to contradict it.
    */
-  public static final Toggle kSingleTagEstimation =
-      Toggle.of("/Tuning/Vision/SingleTagEstimation", true);
+  public static final LoggedTunableBoolean kSingleTagEstimation =
+      LoggedTunableBoolean.of("/Tuning/Vision/SingleTagEstimation", true);
 
   // MARK: - Odometry
 
   /** Whether the pose estimate is clamped to keep the robot footprint inside the field walls. */
-  public static final Toggle kWallClamp = Toggle.of("/Tuning/Odometry/WallClamp", true);
+  public static final LoggedTunableBoolean kWallClamp = LoggedTunableBoolean.of("/Tuning/Odometry/WallClamp", true);
 
   /** Whether wheel travel is scaled down while the robot is tilted, e.g. crossing a ramp. */
-  public static final Toggle kOdometryTiltCompensation =
-      Toggle.of("/Tuning/Odometry/TiltCompensation", false);
+  public static final LoggedTunableBoolean kOdometryTiltCompensation =
+      LoggedTunableBoolean.of("/Tuning/Odometry/TiltCompensation", false);
 }

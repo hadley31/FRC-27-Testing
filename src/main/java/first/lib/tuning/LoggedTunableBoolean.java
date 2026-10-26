@@ -7,42 +7,56 @@ import org.wpilib.networktables.BooleanEntry;
 import org.wpilib.networktables.NetworkTableInstance;
 
 /**
- * A tuned flag that survives a reboot. See {@link LoggedTunable} for what that buys and what it
- * costs.
+ * A tunable flag: one a dashboard can flip, that replays faithfully from a log, and that can
+ * optionally survive a robot reboot. See {@link LoggedTunable} for the whole contract.
  *
- * <h2>This is not {@link Toggle}, and the difference is the point</h2>
- *
- * <p>A {@code Toggle} is a <em>behaviour</em> switch and resets to its competition default every
- * boot, deliberately: its javadoc spells out that a persisted kill switch from a Thursday debug
- * session will quietly still be set at Saturday's event. This class persists, so it is for a flag
- * that is part of a <em>tuned configuration</em> -- something you would be annoyed to re-enter and
- * that you intend to commit back to source.
- *
- * <p>If you are reaching for this to turn a feature on and off, you want {@code Toggle}.
+ * <p>This covers both halves of what used to be two classes. {@link #of} is a feature toggle: it
+ * resets to its competition default every boot, which is what a behaviour switch wants.
+ * {@link #persistent} saves the value, which is what a tuned configuration wants. The hazard of
+ * confusing them is spelled out on {@link LoggedTunable}.
  */
 public final class LoggedTunableBoolean extends LoggedTunable<Boolean> implements BooleanSupplier {
   /**
-   * A tuned flag that AdvantageKit refreshes once per loop.
+   * A feature toggle: a flag that resets to its competition default every boot.
    *
-   * @param path absolute NT path
-   * @param codeDefault the value committed in code, used until something is stored on the robot
+   * <p>The default is the <em>competition</em> behaviour, because a robot with a wiped dashboard
+   * must still play a valid match. Anything else makes the dashboard a hidden dependency of being
+   * able to compete.
+   *
+   * @param path absolute NT path, e.g. {@code "/Tuning/Shot/VelocityCompensation"}
+   * @param codeDefault the value a robot with no dashboard should use
    */
   public static LoggedTunableBoolean of(String path, boolean codeDefault) {
-    return new LoggedTunableBoolean(path, codeDefault, true);
+    return new LoggedTunableBoolean(path, codeDefault, false, true);
   }
 
   /**
-   * A tuned flag belonging to a larger tunable, whose owner calls {@code periodic()}.
+   * A flag the robot saves and restores at boot.
+   *
+   * <p>Read {@link LoggedTunable}'s note before reaching for this: most behaviour switches should
+   * <em>not</em> persist. This is for a flag that is part of a tuned configuration.
    *
    * @param path absolute NT path
-   * @param codeDefault the value committed in code
+   * @param codeDefault the value used until something is stored on the robot
    */
-  public static LoggedTunableBoolean owned(String path, boolean codeDefault) {
-    return new LoggedTunableBoolean(path, codeDefault, false);
+  public static LoggedTunableBoolean persistent(String path, boolean codeDefault) {
+    return new LoggedTunableBoolean(path, codeDefault, true, true);
   }
 
-  private LoggedTunableBoolean(String path, boolean codeDefault, boolean register) {
-    super(path, codeDefault, new Codec(), register);
+  /**
+   * A flag belonging to a larger tunable, whose owner calls {@code periodic()}.
+   *
+   * @param path absolute NT path
+   * @param codeDefault the value used until something is stored on the robot
+   * @param persistent whether the robot saves the value across a reboot
+   */
+  public static LoggedTunableBoolean owned(String path, boolean codeDefault, boolean persistent) {
+    return new LoggedTunableBoolean(path, codeDefault, persistent, false);
+  }
+
+  private LoggedTunableBoolean(
+      String path, boolean codeDefault, boolean persistent, boolean register) {
+    super(path, codeDefault, new Codec(), persistent, register);
   }
 
   @Override
@@ -54,11 +68,14 @@ public final class LoggedTunableBoolean extends LoggedTunable<Boolean> implement
     private BooleanEntry m_entry;
 
     @Override
-    public void bind(String path, Boolean codeDefault) {
+    public void bind(String path, Boolean codeDefault, boolean persistent) {
       var topic = NetworkTableInstance.getDefault().getBooleanTopic(path);
       m_entry = topic.getEntry(codeDefault);
       m_entry.setDefault(codeDefault);
-      topic.setPersistent(true);
+
+      if (persistent) {
+        topic.setPersistent(true);
+      }
     }
 
     @Override

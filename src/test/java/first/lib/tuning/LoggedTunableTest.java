@@ -27,7 +27,7 @@ import org.wpilib.units.measure.Angle;
  * it, that reads are cached rather than live, and that a measure is stored in the unit it was
  * declared in.
  *
- * <p>The fixture is {@code ToggleTest}'s, for the same reason: persistent values land in server
+ * <p>The wildcard subscriber in the fixture is load-bearing: persistent values land in server
  * storage and need a local subscriber to propagate back out to getters, which is what
  * {@code RobotBase} arranges on a real robot.
  */
@@ -78,7 +78,7 @@ class LoggedTunableTest {
       publisher.set(3.5);
       inst.flush();
 
-      var tunable = LoggedTunableDouble.of("/Tuning/Test/Stored", 1.0);
+      var tunable = LoggedTunableDouble.persistent("/Tuning/Test/Stored", 1.0);
 
       assertEquals(3.5, tunable.getAsDouble(), "setDefault must not stamp over a stored value");
       assertEquals(1.0, tunable.codeDefault());
@@ -88,7 +88,7 @@ class LoggedTunableTest {
 
   @Test
   void theTopicIsFlaggedSoTheServerSavesIt() {
-    LoggedTunableDouble.of("/Tuning/Test/Persisted", 2.0);
+    LoggedTunableDouble.persistent("/Tuning/Test/Persisted", 2.0);
     NetworkTableInstance.getDefault().flush();
 
     // The ordering under test: the server ignores setPersistent on a topic that has never published
@@ -96,6 +96,40 @@ class LoggedTunableTest {
     // reboot" claim, split so each half points at one cause when it fails.
     assertTrue(
         NetworkTableInstance.getDefault().getDoubleTopic("/Tuning/Test/Persisted").isPersistent());
+  }
+
+  @Test
+  void anOrdinaryValueIsNotPersisted() {
+    // of() is the feature-toggle case. A persisted kill switch from a debug session would still be
+    // set at the next event, so a behaviour switch must come back to its competition default.
+    LoggedTunableDouble.of("/Tuning/Test/Transient", 2.0);
+    NetworkTableInstance.getDefault().flush();
+
+    assertFalse(
+        NetworkTableInstance.getDefault().getDoubleTopic("/Tuning/Test/Transient").isPersistent());
+  }
+
+  @Test
+  void onlyPersistentValuesRaiseTheAlert() {
+    var toggle = LoggedTunableBoolean.of("/Tuning/Test/Switch", false);
+    var tuned = LoggedTunableDouble.persistent("/Tuning/Test/Tuned", 1.0);
+
+    toggle.set(true);
+    toggle.periodic();
+    LoggedTunables.refresh();
+
+    // Logged either way, so the log still answers "is anything unusual switched on?"...
+    assertArrayEquals(new String[] {"/Tuning/Test/Switch"}, LoggedTunables.nonDefaultPaths());
+    // ...but a value that resets at boot cannot outlive this session, so it does not nag.
+    assertEquals(0, LoggedTunables.nonDefaultPersistentPaths().length);
+    assertFalse(alertIsActive());
+
+    tuned.set(5.0);
+    tuned.periodic();
+    LoggedTunables.refresh();
+
+    assertArrayEquals(new String[] {"/Tuning/Test/Tuned"}, LoggedTunables.nonDefaultPersistentPaths());
+    assertTrue(alertIsActive());
   }
 
   @Test
@@ -129,7 +163,7 @@ class LoggedTunableTest {
 
   @Test
   void theAlertNamesOffDefaultValuesAndClearsOnReset() {
-    var tunable = LoggedTunableDouble.of("/Tuning/Test/Alerting", 1.0);
+    var tunable = LoggedTunableDouble.persistent("/Tuning/Test/Alerting", 1.0);
 
     LoggedTunables.refresh();
     assertEquals(0, LoggedTunables.nonDefaultPaths().length);
@@ -258,8 +292,8 @@ class LoggedTunableTest {
 
   @Test
   void pathsMustBeAbsoluteAndNameATopic() {
-    // Same rule as Toggle and TunableDoubleArray, which share this package: a relative path would
-    // create a topic with no leading slash that dashboards will not nest.
+    // Same rule as TunableDoubleArray, which shares this package: a relative path would create a
+    // topic with no leading slash that dashboards will not nest.
     assertThrows(
         IllegalArgumentException.class, () -> LoggedTunableDouble.of("Tuning/Test/Relative", 1.0));
     assertThrows(

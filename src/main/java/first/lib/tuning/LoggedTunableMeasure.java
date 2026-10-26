@@ -9,14 +9,14 @@ import org.wpilib.units.Unit;
 import first.lib.util.UnitDoubleConverter;
 
 /**
- * A tuned physical quantity -- an angle, a distance, a velocity -- that survives a reboot. See
- * {@link LoggedTunable} for what that buys and what it costs.
+ * A tunable physical quantity -- an angle, a distance, a velocity -- that can survive a reboot. See
+ * {@link LoggedTunable} for the whole contract.
  *
  * <p>The unit comes from the default value, so a declaration names it once and never again:
  *
  * <pre>
  * public static final LoggedTunableMeasure&lt;Angle&gt; kAimOffset =
- *     LoggedTunableMeasure.of("/Tuning/Turret/AimOffset", Degrees.of(2.5));
+ *     LoggedTunableMeasure.persistent("/Tuning/Turret/AimOffset", Degrees.of(2.5));
  * </pre>
  *
  * <p>That value is stored, read and displayed in degrees, and {@link #get()} hands back an
@@ -59,7 +59,22 @@ public final class LoggedTunableMeasure<M extends Measure<?>> extends LoggedTuna
     // The explicit type witness is not decoration. UnitDoubleConverter.of infers M from its target
     // type, and nesting it in a diamond makes the two inferences depend on each other.
     return new LoggedTunableMeasure<>(
-        path, codeDefault, UnitDoubleConverter.<U, M>of(codeDefault.unit()), true);
+        path, codeDefault, UnitDoubleConverter.<U, M>of(codeDefault.unit()), false, true);
+  }
+
+  /**
+   * A tuned quantity the robot saves and restores at boot, in its default value's own unit.
+   *
+   * <p>The usual choice for a measured quantity: an offset or a tolerance found on the practice
+   * field should still be there tomorrow.
+   *
+   * @param path absolute NT path; the unit name is appended
+   * @param codeDefault the value committed in code, whose unit this value is published in
+   */
+  public static <U extends Unit, M extends Measure<U>> LoggedTunableMeasure<M> persistent(
+      String path, M codeDefault) {
+    return new LoggedTunableMeasure<>(
+        path, codeDefault, UnitDoubleConverter.<U, M>of(codeDefault.unit()), true, true);
   }
 
   /**
@@ -76,7 +91,7 @@ public final class LoggedTunableMeasure<M extends Measure<?>> extends LoggedTuna
    */
   public static <M extends Measure<?>> LoggedTunableMeasure<M> of(
       String path, UnitDoubleConverter<M> converter, M codeDefault) {
-    return new LoggedTunableMeasure<>(path, codeDefault, converter, true);
+    return new LoggedTunableMeasure<>(path, codeDefault, converter, false, true);
   }
 
   /**
@@ -85,17 +100,23 @@ public final class LoggedTunableMeasure<M extends Measure<?>> extends LoggedTuna
    * @param path absolute NT path; the unit name is appended
    * @param converter the unit to store and display in
    * @param codeDefault the value committed in code
+   * @param persistent whether the robot saves the value across a reboot
    */
   public static <M extends Measure<?>> LoggedTunableMeasure<M> owned(
-      String path, UnitDoubleConverter<M> converter, M codeDefault) {
-    return new LoggedTunableMeasure<>(path, codeDefault, converter, false);
+      String path, UnitDoubleConverter<M> converter, M codeDefault, boolean persistent) {
+    return new LoggedTunableMeasure<>(path, codeDefault, converter, persistent, false);
   }
 
   private LoggedTunableMeasure(
-      String path, M codeDefault, UnitDoubleConverter<M> converter, boolean register) {
+      String path,
+      M codeDefault,
+      UnitDoubleConverter<M> converter,
+      boolean persistent,
+      boolean register) {
     // The codec is complete before super() runs, which is the whole reason LoggedTunableCodec
     // exists: a base-class constructor calling back into a subclass would find m_converter null.
-    super(pathWithUnit(path, converter), codeDefault, new Codec<>(converter), register);
+    super(
+        pathWithUnit(path, converter), codeDefault, new Codec<>(converter), persistent, register);
     m_converter = converter;
   }
 
@@ -134,11 +155,14 @@ public final class LoggedTunableMeasure<M extends Measure<?>> extends LoggedTuna
     }
 
     @Override
-    public void bind(String path, M codeDefault) {
+    public void bind(String path, M codeDefault, boolean persistent) {
       var topic = NetworkTableInstance.getDefault().getDoubleTopic(path);
       m_entry = topic.getEntry(m_converter.toDouble(codeDefault));
       m_entry.setDefault(m_converter.toDouble(codeDefault));
-      topic.setPersistent(true);
+
+      if (persistent) {
+        topic.setPersistent(true);
+      }
     }
 
     @Override

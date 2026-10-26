@@ -26,14 +26,21 @@ import org.wpilib.util.Alert;
  * <p>The alert text names the first few offenders, which recovers most of the diagnostic value. The
  * full list goes to {@code Tuning/NonDefaultTunables}, which is where you actually look, because by
  * then you are already in AdvantageScope.
+ *
+ * <h2>Only persistent values alert</h2>
+ *
+ * <p>Everything off-default is logged, but only a {@link LoggedTunable#isPersistent()} one raises
+ * the alert. The hazard being guarded against is a value <em>outliving the session that set it</em>,
+ * and a non-persistent one resets at boot, so it cannot. Alerting on those too would nag a driver
+ * who flipped a feature toggle on purpose, which is how an alert panel gets ignored.
  */
 public final class LoggedTunables {
   /**
    * Where tunable values belong in the NT tree.
    *
-   * <p>Shared with {@link Toggle} and {@link TunableDoubleArray} by convention rather than by
-   * enforcement -- a path is just a path -- so that everything tunable on the robot sits in one
-   * subtree a dashboard can be pointed at.
+   * <p>Shared with {@link TunableDoubleArray} by convention rather than by enforcement -- a path is
+   * just a path -- so that everything tunable on the robot sits in one subtree a dashboard can be
+   * pointed at.
    */
   public static final String kRoot = "/Tuning";
 
@@ -91,15 +98,21 @@ public final class LoggedTunables {
     List<String> descriptions = new ArrayList<>();
 
     for (LoggedTunable<?> tunable : s_registry) {
-      if (!tunable.isDefault()) {
+      if (tunable.isDefault()) {
+        continue;
+      }
+
+      descriptions.add(
+          tunable.path() + " = " + tunable.get() + " (code: " + tunable.codeDefault() + ")");
+
+      if (tunable.isPersistent()) {
         paths.add(tunable.path());
-        descriptions.add(
-            tunable.path() + " = " + tunable.get() + " (code: " + tunable.codeDefault() + ")");
       }
     }
 
     Logger.recordOutput("Tuning/NonDefaultTunables", descriptions.toArray(String[]::new));
-    Logger.recordOutput("Tuning/NonDefaultTunableCount", paths.size());
+    Logger.recordOutput("Tuning/NonDefaultTunableCount", descriptions.size());
+    Logger.recordOutput("Tuning/NonDefaultPersistentTunableCount", paths.size());
     // Declared paths stay in networktables.json forever after a declaration is deleted from source,
     // because nothing ever un-persists a topic. This output is what lets a human diff declared
     // against stored and spot the orphans.
@@ -116,12 +129,26 @@ public final class LoggedTunables {
   /**
    * Every declared value currently sitting on something other than its code default, sorted.
    *
-   * <p>The same set the alert counts and {@code Tuning/NonDefaultTunables} records. Useful for a
+   * <p>The same set {@code Tuning/NonDefaultTunables} records -- persistent or not. Useful for a
    * pre-match check that wants to assert the robot is running what the source says.
    */
   public static String[] nonDefaultPaths() {
     return s_registry.stream()
         .filter(tunable -> !tunable.isDefault())
+        .map(LoggedTunable::path)
+        .sorted()
+        .toArray(String[]::new);
+  }
+
+  /**
+   * Every off-default value the robot will still be carrying after a reboot, sorted.
+   *
+   * <p>The set the alert counts. This is the pre-match question: a non-persistent value resets on
+   * its own, so only these can surprise you tomorrow.
+   */
+  public static String[] nonDefaultPersistentPaths() {
+    return s_registry.stream()
+        .filter(tunable -> !tunable.isDefault() && tunable.isPersistent())
         .map(LoggedTunable::path)
         .sorted()
         .toArray(String[]::new);

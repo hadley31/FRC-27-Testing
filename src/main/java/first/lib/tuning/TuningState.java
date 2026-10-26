@@ -27,7 +27,7 @@ public class TuningState<U extends Measure<?>> {
     String pathPrefix = LoggedTunables.kRoot + "/" + namePrefix;
 
     m_setpoint = LoggedTunableMeasure.owned(
-        pathPrefix + "/Setpoint", setpointType, setpointType.of(0.0));
+        pathPrefix + "/Setpoint", setpointType, setpointType.of(0.0), true);
     m_gains = new LoggedTunableGains(pathPrefix);
   }
 
