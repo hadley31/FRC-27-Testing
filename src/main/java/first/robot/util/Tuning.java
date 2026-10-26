@@ -21,9 +21,21 @@ import first.lib.tuning.Toggle;
  *       work this way, which is what keeps them unit-testable without NetworkTables.
  * </ul>
  *
+ * <h2>Where persistent tuned values go</h2>
+ *
+ * <p>A toggle or a tunable table here resets to its committed default every boot. A value you
+ * actually tune — a gain, a setpoint, an offset — belongs in a {@code LoggedTunable} instead: those
+ * are persistent NT topics under {@code /Tuning}, so they survive a reboot, and
+ * {@code LoggedTunables.refresh()} raises one driver-station alert naming every one that no longer
+ * matches the code. Declare those here too, under their own section.
+ *
+ * <p>A mechanism's gains and setpoint are already covered — {@code TuningState} claims them under the
+ * mechanism's own name, so they need no declaration here.
+ *
  * <p>Class initialization publishes the NT topics, so this class must first be touched from the
  * {@code Robot} constructor or later — by then {@code RobotBase} has started the NT server and
- * loaded any persisted values.
+ * loaded any persisted values. That ordering is load-bearing for a {@code LoggedTunable}: touched
+ * earlier, there is no server to persist to.
  */
 public final class Tuning {
   private Tuning() {

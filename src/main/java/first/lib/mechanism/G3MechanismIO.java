@@ -1,7 +1,5 @@
 package first.lib.mechanism;
 
-import first.lib.tuning.TunableGains;
-
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 /**
@@ -11,7 +9,7 @@ import org.littletonrobotics.junction.inputs.LoggableInputs;
  * @param <I> the inputs class this IO populates
  */
 public interface G3MechanismIO<I extends LoggableInputs> extends LoggedComponentIO<I> {
-  public void setGains(TunableGains gains);
+  public void setGains(Gains gains);
 
   public void halt();
 }

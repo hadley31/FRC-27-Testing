@@ -105,6 +105,6 @@ public final class UnitDoubleConverter<M extends Measure<?>> {
 
   @Override
   public String toString() {
-    return "MeasureType[" + m_unit.name() + "]";
+    return "UnitDoubleConverter[" + m_unit.name() + "]";
   }
 }

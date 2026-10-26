@@ -1,57 +1,61 @@
 package first.lib.tuning;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.wpilib.units.Units.Degrees;
 import static org.wpilib.units.Units.Rotations;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.Files;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.wpilib.backend.NetworkTablesTunableBackend;
 import org.wpilib.command3.Mechanism;
+import org.wpilib.networktables.MultiSubscriber;
 import org.wpilib.networktables.NetworkTableInstance;
-import org.wpilib.tunable.TunableRegistry;
 
 import first.lib.util.UnitDoubleConverter;
 
 /**
- * Covers the two things that have to hold for live tuning to be trustworthy: a setpoint means the same
- * value on the way out as on the way in, and a mechanism's topics are published exactly once.
+ * Covers what has to hold for live tuning to be trustworthy: a setpoint means the same value on the
+ * way out as on the way in, a mechanism's paths are claimed exactly once, gains tuned in a session
+ * are still there after a reboot, and a gain edit is reported for exactly one loop.
  */
 class TuningStateTest {
-  /** Named for its topics: {@code getName()} on a mechanism is its class's simple name. */
+  /** Named for its paths: {@code getName()} on a mechanism is its class's simple name. */
   private static final class Thing implements Mechanism {
   }
 
   private static final class OtherThing implements Mechanism {
   }
 
-  private NetworkTableInstance m_inst;
-  private List<String> m_warnings;
+  private static MultiSubscriber s_subAll;
 
-  @BeforeEach
-  void setUp() {
-    m_inst = NetworkTableInstance.create();
-    TunableRegistry.reset();
-    TuningStateCache.clear();
-    TunableRegistry.registerBackend("", new NetworkTablesTunableBackend(m_inst, "/Tunables"));
+  @BeforeAll
+  static void startServer() throws Exception {
+    var inst = NetworkTableInstance.getDefault();
+    inst.startServer(Files.createTempFile("nt-tuning-state-test", ".json").toString(), "", "", 0);
+    s_subAll = new MultiSubscriber(inst, new String[] {""});
+  }
 
-    m_warnings = new ArrayList<>();
-    TunableRegistry.setReportWarning(m_warnings::add);
+  @AfterAll
+  static void stopServer() {
+    s_subAll.close();
+    NetworkTableInstance.getDefault().stopServer();
   }
 
   @AfterEach
   void tearDown() {
-    TunableRegistry.setReportWarning(null);
-    TunableRegistry.reset();
+    // Both, together. A cached state across a registry reset holds paths the registry has forgotten,
+    // and a registry reset without clearing the cache leaves the next test colliding with it.
     TuningStateCache.clear();
-    m_inst.close();
+    LoggedTunables.reset();
   }
 
   @Test
@@ -59,6 +63,7 @@ class TuningStateTest {
     var state = TuningStateCache.getOrCreate(new Thing(), UnitDoubleConverter.DEGREES);
 
     state.setSetpoint(Rotations.of(0.5));
+    state.periodic();
 
     assertEquals(180.0, state.setpoint().in(Degrees), 1e-9);
   }
@@ -71,11 +76,9 @@ class TuningStateTest {
         TuningStateCache.getOrCreate(thing, UnitDoubleConverter.DEGREES),
         TuningStateCache.getOrCreate(thing, UnitDoubleConverter.DEGREES));
 
-    // The reason the cache exists: a second TuningState would try to publish topics the backend is
-    // already serving, warn, and hand back tunables no dashboard is writing to.
-    assertTrue(m_warnings.isEmpty(), m_warnings.toString());
-    assertEquals(
-        0.0, m_inst.getDoubleTopic("/Tunables/Thing Setpoint").subscribe(Double.NaN).get(), 0.0);
+    assertTrue(
+        NetworkTableInstance.getDefault().getDoubleTopic("/Tuning/Thing/kP").exists(),
+        "gains should be claimed under the mechanism's name");
   }
 
   @Test
@@ -83,7 +86,70 @@ class TuningStateTest {
     assertNotSame(
         TuningStateCache.getOrCreate(new Thing(), UnitDoubleConverter.DEGREES),
         TuningStateCache.getOrCreate(new OtherThing(), UnitDoubleConverter.DEGREES));
+  }
 
-    assertTrue(m_warnings.isEmpty(), m_warnings.toString());
+  @Test
+  void aSecondStateForTheSameNameIsRejected() {
+    TuningStateCache.getOrCreate(new Thing(), UnitDoubleConverter.DEGREES);
+
+    // The reason the cache exists. Two states under one name would share every path, so two
+    // instances of a mechanism would silently share one kP -- a bug you find on the field.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new TuningState<>("Thing", UnitDoubleConverter.DEGREES));
+  }
+
+  @Test
+  void gainsPersistAndAreReportedAsOffDefault() {
+    // The whole point of moving gains off org.wpilib.tunable: a value stored on the robot beats the
+    // code default, so a session survives the reboots between matches.
+    var inst = NetworkTableInstance.getDefault();
+    try (var publisher = inst.getDoubleTopic("/Tuning/Persisted/kP").publish()) {
+      publisher.set(4.25);
+      inst.flush();
+
+      var state = new TuningState<>("Persisted", UnitDoubleConverter.DEGREES);
+
+      assertEquals(4.25, state.gains().kP());
+
+      LoggedTunables.refresh();
+      assertArrayEquals(new String[] {"/Tuning/Persisted/kP"}, LoggedTunables.nonDefaultPaths());
+    }
+  }
+
+  @Test
+  void aGainEditIsReportedForExactlyOneLoop() {
+    var state = new TuningState<>("Edited", UnitDoubleConverter.DEGREES);
+
+    state.periodic();
+    assertFalse(state.gainsChangedThisLoop());
+
+    var inst = NetworkTableInstance.getDefault();
+    try (var publisher = inst.getDoubleTopic("/Tuning/Edited/kD").publish()) {
+      publisher.set(0.5);
+      inst.flush();
+
+      state.periodic();
+      assertTrue(state.gainsChangedThisLoop());
+      assertEquals(0.5, state.gains().kD());
+
+      // The bug this replaces: org.wpilib.tunable's flag was never cleared, so one edit left
+      // tuningCommand issuing a retrying blocking CAN config write every loop for the rest of the
+      // enable.
+      state.periodic();
+      assertFalse(state.gainsChangedThisLoop());
+    }
+  }
+
+  @Test
+  void aSetpointEditDoesNotCountAsAGainEdit() {
+    var state = new TuningState<>("Setpointed", UnitDoubleConverter.DEGREES);
+
+    state.setSetpoint(Degrees.of(45));
+    state.periodic();
+
+    // Applying gains is a blocking CAN write; a setpoint is pushed every loop anyway.
+    assertEquals(45.0, state.setpoint().in(Degrees), 1e-9);
+    assertFalse(state.gainsChangedThisLoop());
   }
 }

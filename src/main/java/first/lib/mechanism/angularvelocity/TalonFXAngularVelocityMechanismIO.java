@@ -11,7 +11,7 @@ import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.TalonFX;
 
 import first.lib.util.PhoenixUtil;
-import first.lib.tuning.TunableGains;
+import first.lib.mechanism.Gains;
 
 public class TalonFXAngularVelocityMechanismIO implements AngularVelocityMechanismIO {
   private final TalonFX m_motor;
@@ -46,7 +46,7 @@ public class TalonFXAngularVelocityMechanismIO implements AngularVelocityMechani
   }
 
   @Override
-  public void setGains(TunableGains gains) {
+  public void setGains(Gains gains) {
     var slot0Configs = new Slot0Configs()
         .withKS(gains.kS())
         .withKV(gains.kV())

@@ -121,10 +121,17 @@ public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInput
     TuningState<U> tuning = getTuningState();
 
     return run(coroutine -> {
+      // Apply once on entry. changedThisLoop() is true only for the cycle a change lands in, so a
+      // gain edited before this command was scheduled would otherwise never reach the controller.
+      getIO().setGains(tuning.gains());
       setTarget(tuning.setpoint());
 
       while (true) {
-        if (tuning.hasChanged()) {
+        // One apply per edit, which is what this was always trying to say. The gains used to be
+        // org.wpilib.tunable values whose hasChanged() flag nothing ever cleared, so a single edit
+        // left this issuing a retrying blocking CAN config write every loop for the rest of the
+        // enable.
+        if (tuning.gainsChangedThisLoop()) {
           getIO().setGains(tuning.gains());
         }
 
@@ -163,6 +170,12 @@ public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInput
    * TunableCommand} for why the binding has to be written out in v3.
    */
   public default void registerTuningCommand() {
+    // The tuning state owns the refresh of its own values rather than letting AdvantageKit refresh
+    // them one at a time, so a cycle never hands the controller a setpoint from this loop and gains
+    // from the last. Sideloaded callbacks run before any command in the same Scheduler.run(), which
+    // is what makes that refresh land ahead of the tuning command that reads it.
+    getRegisteredScheduler().addPeriodic(getTuningState()::periodic);
+
     Tunables.publish(
         "Tuning/Commands/%s".formatted(getName()),
         new TunableCommand(tuningCommand(), getRegisteredScheduler()));

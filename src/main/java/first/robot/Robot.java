@@ -27,6 +27,7 @@ import com.ctre.phoenix6.swerve.SwerveModuleConstants;
 
 import first.lib.mechanism.angle.TalonFXAngleMechanismIO;
 import first.lib.mechanism.angularvelocity.TalonFXAngularVelocityMechanismIO;
+import first.lib.tuning.LoggedTunables;
 import first.lib.tuning.Toggle;
 import first.lib.util.LoggedTracer;
 import first.lib.util.SchedulerLogger;
@@ -119,6 +120,7 @@ public class Robot extends LoggedOpModeRobot {
     var geometryViz = new RobotGeometryViz(state, intakePivot);
 
     Scheduler.getDefault().addPeriodic(Toggle::logNonDefaults);
+    Scheduler.getDefault().addPeriodic(LoggedTunables::refresh);
     Scheduler.getDefault().addPeriodic(state::periodic);
 
     // After state::periodic, so the model is drawn from the pose estimate this loop produced

@@ -11,16 +11,16 @@ import first.lib.util.UnitDoubleConverter;
 /**
  * The one {@link TuningState} each mechanism gets, created on first ask.
  *
- * <p>A {@code TuningState} publishes NetworkTables topics named after its mechanism, and the tunable
- * backend rejects a second publish to a path it already serves. Building one per mechanism is
- * therefore not just wasteful but visibly broken -- the second attempt warns and hands back tunables
- * nothing is listening to. Mechanisms are interfaces all the way down and cannot hold a field to cache
- * one in, so the cache lives here instead and {@code getTuningState()} stays safe to call as often as
- * anyone likes.
+ * <p>A {@code TuningState} claims preference keys named after its mechanism, and
+ * {@link LoggedTunables} rejects a duplicate key outright. Building one per mechanism is therefore
+ * not merely wasteful, it throws. Mechanisms are interfaces all the way down and cannot hold a field
+ * to cache one in, so the cache lives here instead and {@code getTuningState()} stays safe to call
+ * as often as anyone likes.
  *
- * <p>Keyed by mechanism identity, so two instances of the same mechanism class get their own state and
- * collide on their topic names, warning the way any other duplicate publish does. Keying by name would
- * silence that warning by quietly handing both instances the same setpoint, which is worse.
+ * <p>Keyed by mechanism identity, so two instances of the same mechanism class get their own state
+ * and collide on their key names, which throws. Keying by name would hide that by quietly handing
+ * both instances the same setpoint and the same gains, which is worse: two turrets silently sharing
+ * one kP is a bug you find on the field.
  */
 public final class TuningStateCache {
   private static final Map<Mechanism, TuningState<?>> s_cache = new IdentityHashMap<>();
@@ -29,10 +29,10 @@ public final class TuningStateCache {
   }
 
   /**
-   * The tuning state for a mechanism, creating and publishing it if this is the first ask.
+   * The tuning state for a mechanism, creating it if this is the first ask.
    *
-   * @param mechanism the mechanism being tuned, which names the published topics
-   * @param setpointType the unit its setpoint is published in
+   * @param mechanism the mechanism being tuned, which names its preference keys
+   * @param setpointType the unit its setpoint is stored and displayed in
    * @return the mechanism's one tuning state
    */
   @SuppressWarnings("unchecked")
@@ -47,8 +47,9 @@ public final class TuningStateCache {
   /**
    * Forgets every cached state.
    *
-   * <p>For tests, which build mechanisms and reset the tunable registry repeatedly: a state cached
-   * across a reset holds tunables whose backend entries are gone.
+   * <p>For tests, which build mechanisms repeatedly. Pair it with {@link LoggedTunables#reset()}:
+   * a state cached across a registry reset holds keys the registry no longer knows about, and a
+   * registry reset without this leaves the next test's state colliding with a cached one.
    */
   public static void clear() {
     s_cache.clear();

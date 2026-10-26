@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.wpilib.driverstation.internal.DriverStationBackend;
 import org.wpilib.fields.Fields;
@@ -19,7 +20,9 @@ import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.geometry.Translation2d;
 import org.wpilib.math.kinematics.ChassisVelocities;
 
-import first.lib.tuning.TunableGains;
+import first.lib.mechanism.Gains;
+import first.lib.tuning.LoggedTunables;
+import first.lib.tuning.TuningStateCache;
 import first.lib.mechanism.angle.AngleMechanismIO;
 import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismIO;
@@ -97,7 +100,7 @@ class RobotStateTest {
     }
 
     @Override
-    public void setGains(TunableGains gains) {
+    public void setGains(Gains gains) {
     }
 
     @Override
@@ -115,7 +118,7 @@ class RobotStateTest {
     }
 
     @Override
-    public void setGains(TunableGains gains) {
+    public void setGains(Gains gains) {
     }
 
     @Override
@@ -152,6 +155,15 @@ class RobotStateTest {
     // touched before the driver station has been refreshed once.
     HAL.initialize();
     DriverStationBackend.refreshData();
+  }
+
+  @BeforeEach
+  void clearTuningRegistry() {
+    // Every test builds a fresh Turret, Hood and Flywheel, and each one claims preference keys named
+    // after itself. Without this the second test to run would throw on a duplicate key -- which is
+    // the point of that check, since on a real robot a mechanism is constructed exactly once.
+    TuningStateCache.clear();
+    LoggedTunables.reset();
   }
 
   private RobotState newState() {

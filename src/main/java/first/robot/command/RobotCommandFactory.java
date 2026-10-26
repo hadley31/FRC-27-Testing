@@ -13,6 +13,7 @@ import org.wpilib.math.geometry.Translation2d;
 import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 
+import first.lib.tuning.LoggedTunableMeasure;
 import first.lib.util.GeometryUtil;
 import first.robot.Robot;
 import first.robot.util.FieldConstants;
@@ -38,6 +39,9 @@ public class RobotCommandFactory {
 
   /** How close the chassis heading must be, in fixed-turret mode, before fuel is fed. */
   private static final Angle kChassisAimTolerance = Degrees.of(2.0);
+
+  private static final LoggedTunableMeasure<AngularVelocity> kIntakeRollerSpeed = LoggedTunableMeasure
+      .of("Intake/RollerSpeed", RPM.of(1000));
 
   /**
    * How slowly the chassis must be turning before its aim is believed.
@@ -283,11 +287,12 @@ public class RobotCommandFactory {
   }
 
   public Command runIntakeRollersIn() {
-    return m_robot.intakeRollers.setTargetCommand(RPM.of(1000)).named("Run Intake Rollers In");
+    return m_robot.intakeRollers.setTargetCommand(kIntakeRollerSpeed).named("Run Intake Rollers In");
   }
 
   public Command runIntakeRollersOut() {
-    return m_robot.intakeRollers.setTargetCommand(RPM.of(1000)).named("Run Intake Rollers Out");
+    return m_robot.intakeRollers.setTargetCommand(() -> kIntakeRollerSpeed.get().unaryMinus())
+        .named("Run Intake Rollers Out");
   }
 
   public Command intakeFuel() {
