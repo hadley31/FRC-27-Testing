@@ -10,12 +10,12 @@ import org.wpilib.driverstation.MatchState;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.opmode.Autonomous;
 import org.wpilib.opmode.PeriodicOpMode;
-import org.wpilib.tunable.Tunables;
+import org.wpilib.units.measure.Time;
 
-import choreo.auto.AutoChooser;
 import choreo.auto.AutoFactory;
-import choreo.auto.AutoRoutine;
 import choreo.auto.AutoTrajectory;
+import first.lib.auto.AutoSegment;
+import first.lib.auto.SegmentedAutoChooser;
 import first.robot.Robot;
 import first.robot.command.RobotCommandFactory;
 import first.robot.mechanism.drive.DriveHeadingController;
@@ -24,30 +24,39 @@ import first.robot.util.Constants;
 import first.robot.util.SwerveInputStream;
 
 /**
- * Every autonomous routine the robot can run, sharing one {@link AutoFactory}, with a chooser
- * deciding which of them this opmode runs.
+ * Every piece of autonomous the robot can run, offered to the drive team as segments they chain
+ * from the dashboard rather than as whole routines.
  *
- * <p>Each routine is a factory method rather than a field: a Choreo {@link AutoRoutine} carries
- * per-run state (trigger bindings and trajectory progress), so one has to be built for the run that
- * is about to start rather than reused. {@link #createAutoChooser()} wires the methods into a
- * chooser, which only calls them once the routine is actually selected -- and only while the robot
- * is disabled, so the trajectories are read off the disk before the match rather than at the
- * moment auto starts.
+ * <p>Each segment is a factory method rather than a field: a Choreo {@link AutoTrajectory} carries
+ * per-run state, so one has to be built for the run that is about to start rather than reused, and
+ * a segment the drive team picked twice needs two of them. {@link SegmentedAutoChooser} is what
+ * calls those methods, once per occurrence, each time the selection changes while the robot is
+ * disabled.
+ *
+ * <p>The slots start on the two-pass auto this class used to run as a single routine, so the
+ * out-of-the-box behaviour is unchanged and the slots are there to depart from it.
  *
  * <p>The chooser is published from the constructor and removed in {@link #close()}, because the
  * framework builds a new instance of this class every time the opmode is selected. Leaving the old
- * publication in place would leave the tunable registry pointed at a dead chooser: the dashboard
- * would be driving the selection of a chooser that no longer runs anything, while this instance sat
- * on its default.
+ * publication in place would leave the tunable registry pointed at dead selectors: the dashboard
+ * would be driving the selection of a chooser that no longer assembles anything, while this
+ * instance sat on its defaults.
  */
 @Autonomous(name = "Competition")
 public class CompetitionAutoMode extends PeriodicOpMode {
   private static final String AUTO_CHOOSER_KEY = "Choosers/Auto";
   private static final String AUTO_TRAJECTORY_LOG_KEY = "RobotState/Odometry/Trajectory/TrajectoryPoses";
+
+  /** How many segments the drive team can chain. Every slot shows on the dashboard. */
+  private static final int kSegmentSlots = 6;
+
+  /** How long a segment keeps trying to put its fuel through the hub before giving up on it. */
+  private static final Time kShotTimeout = Seconds.of(5);
+
   private final Robot m_robot;
   private final RobotCommandFactory m_commands;
   private final AutoFactory m_factory;
-  private final AutoChooser m_chooser;
+  private final SegmentedAutoChooser m_chooser;
   private Command m_autoCommand;
 
   public CompetitionAutoMode(Robot robot) {
@@ -81,7 +90,16 @@ public class CompetitionAutoMode extends PeriodicOpMode {
     m_chooser = createAutoChooser();
   }
 
-  /** Runs whichever routine the chooser is holding when the robot is enabled. */
+  /**
+   * Assembles the auto as the drive team picks it, so the trajectories are read and the segments
+   * are checked against each other before the match rather than at the moment auto starts.
+   */
+  @Override
+  public void disabledPeriodic() {
+    m_chooser.poll();
+  }
+
+  /** Runs whatever the slots add up to when the robot is enabled. */
   @Override
   public void start() {
     m_autoCommand = m_chooser.selectedCommand();
@@ -102,56 +120,88 @@ public class CompetitionAutoMode extends PeriodicOpMode {
     }
   }
 
-  /** Takes the chooser off the dashboard, so the next instance's chooser is what gets published. */
+  /** Takes the slots off the dashboard, so the next instance's are what gets published. */
   @Override
   public void close() {
-    Tunables.remove(AUTO_CHOOSER_KEY);
+    m_chooser.close();
   }
 
   /**
-   * Builds a chooser over every routine in this class and publishes it for the dashboard.
+   * Builds the chooser over every segment in this class and publishes its slots for the dashboard.
    *
-   * @return the chooser, whose {@link AutoChooser#selectedCommand()} is what {@link #start()}
-   *     schedules.
+   * @return the chooser, whose {@link SegmentedAutoChooser#selectedCommand()} is what
+   *     {@link #start()} schedules.
    */
-  private AutoChooser createAutoChooser() {
-    AutoChooser chooser = new AutoChooser();
+  private SegmentedAutoChooser createAutoChooser() {
+    SegmentedAutoChooser chooser = new SegmentedAutoChooser(
+        AUTO_CHOOSER_KEY, kSegmentSlots, () -> m_factory.newRoutine("Segmented Auto"));
 
-    chooser.addRoutine("Left Side Two Pass", this::leftSideTwoPass);
+    chooser.addSegment(fuelPass("Trench Fuel Pass", "LeftTrenchFuelBumpShoot"));
+    chooser.addSegment(fuelPass("Trench Fuel Pass (Second)", "LeftTrenchFuelBumpShootSecondPass"));
+    chooser.addSegment(returnToTrench());
+    chooser.addSegment(shoot());
 
-    Tunables.publish(AUTO_CHOOSER_KEY, chooser);
+    chooser.setDefaultSequence(
+        "Trench Fuel Pass",
+        "Return To Trench",
+        "Trench Fuel Pass (Second)",
+        "Return To Trench");
+
+    chooser.publish();
 
     return chooser;
   }
 
   /**
-   * Shoots the preload, drives out for a second piece, and shoots that.
+   * Starts under the trench, gathers fuel on the way out over the bump, and shoots what it picked
+   * up from where the path leaves it.
    *
-   * @return a newly built routine.
+   * <p>The intake is bound to the path rather than awaited before it, so it comes down as the robot
+   * starts moving and goes back up when the path ends; the shot is awaited after, because it is the
+   * one part of the segment that has to finish before the next segment may have the chassis.
+   *
+   * @param name           what the dashboard calls this pass
+   * @param trajectoryName the Choreo path it drives
+   * @return the segment.
    */
-  public AutoRoutine leftSideTwoPass() {
-    AutoRoutine routine = m_factory.newRoutine("Left Trench Two Pass");
-    AutoTrajectory leftTrenchFuelBumpShoot = routine.trajectory("LeftTrenchFuelBumpShoot");
-    AutoTrajectory leftBumpShootToLeftStartTrench = routine.trajectory("LeftBumpShootToLeftStartTrench");
-    AutoTrajectory leftTrenchFuelBumpShootSecondPass = routine.trajectory("LeftTrenchFuelBumpShootSecondPass");
+  private AutoSegment fuelPass(String name, String trajectoryName) {
+    return new AutoSegment(name, routine -> {
+      AutoTrajectory path = routine.trajectory(trajectoryName);
+      path.active().onTrue(m_commands.intakeFuel());
 
-    Command shootCommand = m_commands.autoAimAndShoot().withTimeout(Seconds.of(5));
+      return AutoSegment.Run.driving(path, Command.noRequirements(coroutine -> {
+        coroutine.await(path.cmd());
+        coroutine.await(m_commands.autoAimAndShoot().withTimeout(kShotTimeout));
+      }).named(name));
+    });
+  }
 
-    leftTrenchFuelBumpShoot.active().onTrue(m_commands.intakeFuel());
-    leftTrenchFuelBumpShootSecondPass.active().onTrue(m_commands.intakeFuel());
-    leftBumpShootToLeftStartTrench.active().onTrue(m_commands.stowAllMechanisms());
+  /**
+   * Drives back over the bump to where a pass starts, stowing on the way.
+   *
+   * @return the segment.
+   */
+  private AutoSegment returnToTrench() {
+    return new AutoSegment("Return To Trench", routine -> {
+      AutoTrajectory path = routine.trajectory("LeftBumpShootToLeftStartTrench");
+      path.active().onTrue(m_commands.stowAllMechanisms());
 
-    routine.active().onTrue(
-        Command.noRequirements(coroutine -> {
-          coroutine.await(leftTrenchFuelBumpShoot.resetOdometry());
-          coroutine.await(leftTrenchFuelBumpShoot.cmd());
-          coroutine.await(shootCommand);
-          coroutine.await(leftBumpShootToLeftStartTrench.cmd());
-          coroutine.await(leftTrenchFuelBumpShootSecondPass.cmd());
-          coroutine.await(shootCommand);
-          coroutine.await(leftBumpShootToLeftStartTrench.cmd());
-        }).named("Two Piece Auto Sequence"));
+      return AutoSegment.Run.driving(path, path.cmd());
+    });
+  }
 
-    return routine;
+  /**
+   * Shoots from wherever the robot is standing, aiming the chassis if the turret cannot get there
+   * on its own.
+   *
+   * <p>Drives nothing, so it can go in any slot -- a preload shot before the first pass, or another
+   * attempt after one.
+   *
+   * @return the segment.
+   */
+  private AutoSegment shoot() {
+    return new AutoSegment(
+        "Shoot", routine -> AutoSegment.Run.stationary(
+            m_commands.autoAimAndShoot().withTimeout(kShotTimeout)));
   }
 }
