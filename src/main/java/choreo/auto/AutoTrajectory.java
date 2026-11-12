@@ -17,6 +17,7 @@ import org.wpilib.command3.Trigger;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.geometry.Translation2d;
+import org.wpilib.math.kinematics.ChassisVelocities;
 import org.wpilib.system.Timer;
 import org.wpilib.util.Alert.Level;
 
@@ -382,6 +383,113 @@ public class AutoTrajectory {
       return Optional.empty();
     }
     return trajectory.getFinalPose(allianceCtx.doFlip());
+  }
+
+  /**
+   * Will get the velocities the trajectory starts at.
+   *
+   * <p>These are the velocities as the sample itself reports them: field-relative for a swerve
+   * trajectory, chassis-relative for a differential one. They are flipped if alliance flipping is
+   * enabled and the alliance supplier returns Red, which negates the components that mirroring
+   * reverses rather than just moving the pose.
+   *
+   * <p>This method returns an empty Optional if the trajectory is empty. This method returns an
+   * empty Optional if alliance flipping is enabled and the alliance supplier returns an empty
+   * Optional.
+   *
+   * @return The starting velocities
+   */
+  public Optional<ChassisVelocities> getInitialChassisVelocities() {
+    if (!allianceCtx.allianceKnownOrIgnored()) {
+      allianceNotReady.set(true);
+      return Optional.empty();
+    }
+    return trajectory.getInitialSample(allianceCtx.doFlip())
+        .map(TrajectorySample::getChassisVelocities);
+  }
+
+  /**
+   * Will get the velocities the trajectory ends at.
+   *
+   * <p>A path that is handing off to another one does not have to end at rest, so this is what says
+   * how fast the robot is still moving when it gets there.
+   *
+   * <p>These are the velocities as the sample itself reports them: field-relative for a swerve
+   * trajectory, chassis-relative for a differential one. They are flipped if alliance flipping is
+   * enabled and the alliance supplier returns Red, which negates the components that mirroring
+   * reverses rather than just moving the pose.
+   *
+   * <p>This method returns an empty Optional if the trajectory is empty. This method returns an
+   * empty Optional if alliance flipping is enabled and the alliance supplier returns an empty
+   * Optional.
+   *
+   * @return The ending velocities
+   */
+  public Optional<ChassisVelocities> getFinalChassisVelocities() {
+    if (!allianceCtx.allianceKnownOrIgnored()) {
+      allianceNotReady.set(true);
+      return Optional.empty();
+    }
+    return trajectory.getFinalSample(allianceCtx.doFlip())
+        .map(TrajectorySample::getChassisVelocities);
+  }
+
+  /**
+   * Will get the pose the trajectory starts at as it was drawn, without alliance flipping.
+   *
+   * <p>Unlike {@link #getInitialPose()} this does not wait on the alliance, because there is no
+   * flipping to wait for: it is the trajectory as the file has it. That makes it the end to use when
+   * comparing two trajectories to each other rather than driving one -- flipping moves both of them
+   * the same way, so two ends that meet unflipped still meet flipped.
+   *
+   * <p>This method returns an empty Optional if the trajectory is empty.
+   *
+   * @return The starting pose as drawn
+   */
+  public Optional<Pose2d> getUnflippedInitialPose() {
+    return trajectory.getInitialPose(false);
+  }
+
+  /**
+   * Will get the pose the trajectory ends at as it was drawn, without alliance flipping.
+   *
+   * <p>See {@link #getUnflippedInitialPose()} for why an unflipped end is the one to compare
+   * against another trajectory.
+   *
+   * <p>This method returns an empty Optional if the trajectory is empty.
+   *
+   * @return The ending pose as drawn
+   */
+  public Optional<Pose2d> getUnflippedFinalPose() {
+    return trajectory.getFinalPose(false);
+  }
+
+  /**
+   * Will get the velocities the trajectory starts at as it was drawn, without alliance flipping.
+   *
+   * <p>See {@link #getUnflippedInitialPose()} for why an unflipped end is the one to compare
+   * against another trajectory.
+   *
+   * <p>This method returns an empty Optional if the trajectory is empty.
+   *
+   * @return The starting velocities as drawn
+   */
+  public Optional<ChassisVelocities> getUnflippedInitialChassisVelocities() {
+    return trajectory.getInitialSample(false).map(TrajectorySample::getChassisVelocities);
+  }
+
+  /**
+   * Will get the velocities the trajectory ends at as it was drawn, without alliance flipping.
+   *
+   * <p>See {@link #getUnflippedInitialPose()} for why an unflipped end is the one to compare
+   * against another trajectory.
+   *
+   * <p>This method returns an empty Optional if the trajectory is empty.
+   *
+   * @return The ending velocities as drawn
+   */
+  public Optional<ChassisVelocities> getUnflippedFinalChassisVelocities() {
+    return trajectory.getFinalSample(false).map(TrajectorySample::getChassisVelocities);
   }
 
   /**

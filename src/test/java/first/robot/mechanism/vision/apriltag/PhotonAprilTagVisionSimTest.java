@@ -19,6 +19,8 @@ import org.wpilib.math.geometry.Transform2d;
 import org.wpilib.math.geometry.Transform3d;
 import org.wpilib.math.geometry.Translation2d;
 
+import first.robot.mechanism.vision.apriltag.photonvision.AprilTagCameraIOPhotonVision;
+import first.robot.mechanism.vision.apriltag.photonvision.AprilTagVisionSimPhotonVision;
 
 /**
  * Drives the simulated camera end to end: place the robot somewhere it can see a tag, render the
@@ -58,7 +60,7 @@ public class PhotonAprilTagVisionSimTest {
     Pose3d tagPose = FIELD.getTagPose(FIELD.getTags().get(0).getID()).orElseThrow();
     Pose2d truePose = facing(tagPose);
 
-    PhotonAprilTagVisionSim visionSim = new PhotonAprilTagVisionSim(FIELD, () -> truePose);
+    AprilTagVisionSimPhotonVision visionSim = new AprilTagVisionSimPhotonVision(FIELD, () -> truePose);
     AprilTagCameraIO io = AprilTagCameraIOPhotonVision.simulated(
         new AprilTagCameraConfig("SimTestCamera", ROBOT_TO_CAMERA),
         FIELD,
@@ -80,7 +82,6 @@ public class PhotonAprilTagVisionSimTest {
     double error = inputs.observedRobotPoses[0].toPose2d().getTranslation().getDistance(truePose.getTranslation());
     assertTrue(error < 0.5, "estimate was %.3f m from the true pose".formatted(error));
   }
-
 
   // MARK: - Pose resets
 
@@ -116,7 +117,7 @@ public class PhotonAprilTagVisionSimTest {
     // moving the robot here means moving what this holds.
     AtomicReference<Pose2d> groundTruth = new AtomicReference<>(oldPose);
 
-    PhotonAprilTagVisionSim visionSim = new PhotonAprilTagVisionSim(FIELD, groundTruth::get);
+    AprilTagVisionSimPhotonVision visionSim = new AprilTagVisionSimPhotonVision(FIELD, groundTruth::get);
     AprilTagCameraIO io = AprilTagCameraIOPhotonVision.simulated(
         new AprilTagCameraConfig("ResetTestCamera", ROBOT_TO_CAMERA),
         FIELD,
@@ -157,7 +158,7 @@ public class PhotonAprilTagVisionSimTest {
    * @return the pose, or empty if the camera produced no frame within the budget
    */
   private static Optional<Pose3d> pumpForFrame(
-      PhotonAprilTagVisionSim visionSim,
+      AprilTagVisionSimPhotonVision visionSim,
       AprilTagCameraIO io,
       AprilTagCameraIOInputsAutoLogged inputs) throws InterruptedException {
     for (int i = 0; i < PUMP_LIMIT; i++) {

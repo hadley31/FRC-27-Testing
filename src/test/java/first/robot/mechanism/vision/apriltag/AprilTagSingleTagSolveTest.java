@@ -17,6 +17,8 @@ import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.geometry.Transform3d;
 import org.wpilib.math.geometry.Translation2d;
 
+import first.robot.mechanism.vision.apriltag.photonvision.AprilTagCameraIOPhotonVision;
+import first.robot.mechanism.vision.apriltag.photonvision.AprilTagVisionSimPhotonVision;
 
 /**
  * Covers the single-tag path, which is the one that needs something from outside the camera.
@@ -89,7 +91,7 @@ public class AprilTagSingleTagSolveTest {
    */
   private static AprilTagCameraIOInputsAutoLogged observe(
       String cameraName, Pose2d truePose, RobotHeadingSource headingSource) {
-    PhotonAprilTagVisionSim visionSim = new PhotonAprilTagVisionSim(FIELD, () -> truePose);
+    AprilTagVisionSimPhotonVision visionSim = new AprilTagVisionSimPhotonVision(FIELD, () -> truePose);
     AprilTagCameraIO io = AprilTagCameraIOPhotonVision.simulated(
         new AprilTagCameraConfig(cameraName, ROBOT_TO_CAMERA), FIELD, headingSource, visionSim);
 

@@ -10,7 +10,7 @@ import choreo.auto.AutoTrajectory;
 
 /**
  * One piece of an auto that the drive team can pick from the dashboard, and that a
- * {@link SegmentedAutoChooser} strings together with others into a single {@link AutoRoutine}.
+ * {@link DynamicAutoChooser} strings together with others into a single {@link AutoRoutine}.
  *
  * <p>A segment is a recipe rather than a built routine. {@link #build(AutoRoutine)} runs once per
  * occurrence, so the same segment can sit in more than one slot and each occurrence gets its own

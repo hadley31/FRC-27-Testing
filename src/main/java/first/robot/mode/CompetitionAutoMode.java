@@ -15,7 +15,7 @@ import org.wpilib.units.measure.Time;
 import choreo.auto.AutoFactory;
 import choreo.auto.AutoTrajectory;
 import first.lib.auto.AutoSegment;
-import first.lib.auto.SegmentedAutoChooser;
+import first.lib.auto.DynamicAutoChooser;
 import first.robot.Robot;
 import first.robot.command.RobotCommandFactory;
 import first.robot.mechanism.drive.DriveHeadingController;
@@ -29,12 +29,18 @@ import first.robot.util.SwerveInputStream;
  *
  * <p>Each segment is a factory method rather than a field: a Choreo {@link AutoTrajectory} carries
  * per-run state, so one has to be built for the run that is about to start rather than reused, and
- * a segment the drive team picked twice needs two of them. {@link SegmentedAutoChooser} is what
+ * a segment the drive team picked twice needs two of them. {@link DynamicAutoChooser} is what
  * calls those methods, once per occurrence, each time the selection changes while the robot is
  * disabled.
  *
- * <p>The slots start on the two-pass auto this class used to run as a single routine, so the
- * out-of-the-box behaviour is unchanged and the slots are there to depart from it.
+ * <p>Only {@code Trench Fuel Pass} is offered as an opening segment, because it is the only path
+ * that starts from a standstill. The second pass starts at 2.7 m/s, which is a fine way to enter a
+ * path the robot is already rolling into and an impossible way to start a match.
+ *
+ * <p>The two passes and the return chain because their ends were drawn to agree: the return leaves
+ * the trench at 1.99 m/s and the second pass picks the robot up there at 2.00 m/s. That handoff is
+ * what the default sequence below rides on, and redrawing either path without the other will take
+ * it apart again -- the chooser stops offering the second pass and says so through its alert.
  *
  * <p>The chooser is published from the constructor and removed in {@link #close()}, because the
  * framework builds a new instance of this class every time the opmode is selected. Leaving the old
@@ -42,7 +48,7 @@ import first.robot.util.SwerveInputStream;
  * would be driving the selection of a chooser that no longer assembles anything, while this
  * instance sat on its defaults.
  */
-@Autonomous(name = "Competition")
+@Autonomous(name = "Competition Auto")
 public class CompetitionAutoMode extends PeriodicOpMode {
   private static final String AUTO_CHOOSER_KEY = "Choosers/Auto";
   private static final String AUTO_TRAJECTORY_LOG_KEY = "RobotState/Odometry/Trajectory/TrajectoryPoses";
@@ -56,7 +62,7 @@ public class CompetitionAutoMode extends PeriodicOpMode {
   private final Robot m_robot;
   private final RobotCommandFactory m_commands;
   private final AutoFactory m_factory;
-  private final SegmentedAutoChooser m_chooser;
+  private final DynamicAutoChooser m_chooser;
   private Command m_autoCommand;
 
   public CompetitionAutoMode(Robot robot) {
@@ -99,7 +105,7 @@ public class CompetitionAutoMode extends PeriodicOpMode {
     m_chooser.poll();
   }
 
-  /** Runs whatever the slots add up to when the robot is enabled. */
+  /** Runs whichever routine the chooser is holding when the robot is enabled. */
   @Override
   public void start() {
     m_autoCommand = m_chooser.selectedCommand();
@@ -129,25 +135,27 @@ public class CompetitionAutoMode extends PeriodicOpMode {
   /**
    * Builds the chooser over every segment in this class and publishes its slots for the dashboard.
    *
-   * @return the chooser, whose {@link SegmentedAutoChooser#selectedCommand()} is what
+   * @return the chooser, whose {@link DynamicAutoChooser#selectedCommand()} is what
    *     {@link #start()} schedules.
    */
-  private SegmentedAutoChooser createAutoChooser() {
-    SegmentedAutoChooser chooser = new SegmentedAutoChooser(
-        AUTO_CHOOSER_KEY, kSegmentSlots, () -> m_factory.newRoutine("Segmented Auto"));
+  private DynamicAutoChooser createAutoChooser() {
+    DynamicAutoChooser chooser = new DynamicAutoChooser(
+        AUTO_CHOOSER_KEY, kSegmentSlots, () -> m_factory.newRoutine("Auto Routine"));
 
-    chooser.addSegment(fuelPass("Trench Fuel Pass", "LeftTrenchFuelBumpShoot"));
-    chooser.addSegment(fuelPass("Trench Fuel Pass (Second)", "LeftTrenchFuelBumpShootSecondPass"));
-    chooser.addSegment(returnToTrench());
-    chooser.addSegment(shoot());
+    AutoSegment trenchFuelPass = fuelPass("Trench Fuel Pass", "LeftTrenchFuelBumpShoot");
+    AutoSegment secondTrenchFuelPass = fuelPass("Trench Fuel Pass (Second)", "LeftTrenchFuelBumpShootSecondPass");
+    AutoSegment returnToTrench = returnToTrench();
+    AutoSegment shoot = shoot();
+
+    // The opening segment is the one the robot can be placed for; the rest are only ever offered
+    // where the graph says they fit.
+    chooser.addInitialSegment(trenchFuelPass);
+    chooser.addSegment(secondTrenchFuelPass);
+    chooser.addSegment(returnToTrench);
+    chooser.addSegment(shoot);
 
     chooser.setDefaultSequence(
-        "Trench Fuel Pass",
-        "Return To Trench",
-        "Trench Fuel Pass (Second)",
-        "Return To Trench");
-
-    chooser.publish();
+        trenchFuelPass, returnToTrench, secondTrenchFuelPass, returnToTrench);
 
     return chooser;
   }

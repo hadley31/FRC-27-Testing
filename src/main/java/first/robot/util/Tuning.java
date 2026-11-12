@@ -65,8 +65,8 @@ public final class Tuning {
    * Turning this off is the first thing to try when shots drift consistently to one side while
    * moving but land while stationary.
    */
-  public static final LoggedTunableBoolean kVelocityCompensation =
-      LoggedTunableBoolean.of("/Tuning/Shot/VelocityCompensation", true);
+  public static final LoggedTunableBoolean kVelocityCompensation = LoggedTunableBoolean
+      .of("/Tuning/Shot/VelocityCompensation", true);
 
   // MARK: - Turret
 
@@ -78,8 +78,7 @@ public final class Tuning {
    * position when idle. Either way an explicit command, such as auto-aim, takes the turret and the
    * toggle has no say until that command ends.
    */
-  public static final LoggedTunableBoolean kAutoAim =
-      LoggedTunableBoolean.of("/Tuning/Turret/AutoAim", false);
+  public static final LoggedTunableBoolean kAutoAim = LoggedTunableBoolean.of("/Tuning/Turret/AutoAim", false);
 
   /**
    * Whether the turret parks at a fixed angle and the <em>chassis</em> does the aiming instead.
@@ -93,10 +92,22 @@ public final class Tuning {
    * the falling one. Expect a longer time-to-shot while it is set, since a loaded chassis turns a
    * good deal slower than a turret.
    */
-  public static final LoggedTunableBoolean kFixedTurretMode =
-      LoggedTunableBoolean.of("/Tuning/Turret/FixedTurretMode", false);
+  public static final LoggedTunableBoolean kFixedTurretMode = LoggedTunableBoolean.of("/Tuning/Turret/FixedTurretMode",
+      false);
 
   // MARK: - Vision
+
+  /**
+   * Whether accepted AprilTag observations correct the pose estimate at all.
+   *
+   * <p>The blunt instrument, and the one to reach for when the estimate is misbehaving and it is not
+   * yet clear whether vision is the cause: off, the frames are still gathered, priced and logged, so
+   * the log answers the question, while the estimate runs on odometry alone and stops moving in the
+   * meantime. Prefer {@link #kSingleTagEstimation} once the log shows the culprit is one-tag frames,
+   * since that keeps the multi-tag ones.
+   */
+  public static final LoggedTunableBoolean kEnableVisionObservations = LoggedTunableBoolean
+      .of("/Tuning/Vision/EnableVisionObservations", true);
 
   /**
    * Whether one-tag solves correct the pose estimate at all, or only multi-tag ones do.
@@ -108,8 +119,8 @@ public final class Tuning {
    * drifting calibration or a mounting transform measured wrong shows up there first, since a
    * one-tag solve has no second tag to contradict it.
    */
-  public static final LoggedTunableBoolean kSingleTagEstimation =
-      LoggedTunableBoolean.of("/Tuning/Vision/SingleTagEstimation", true);
+  public static final LoggedTunableBoolean kSingleTagEstimation = LoggedTunableBoolean
+      .of("/Tuning/Vision/SingleTagEstimation", true);
 
   // MARK: - Odometry
 
@@ -117,6 +128,6 @@ public final class Tuning {
   public static final LoggedTunableBoolean kWallClamp = LoggedTunableBoolean.of("/Tuning/Odometry/WallClamp", true);
 
   /** Whether wheel travel is scaled down while the robot is tilted, e.g. crossing a ramp. */
-  public static final LoggedTunableBoolean kOdometryTiltCompensation =
-      LoggedTunableBoolean.of("/Tuning/Odometry/TiltCompensation", false);
+  public static final LoggedTunableBoolean kOdometryTiltCompensation = LoggedTunableBoolean
+      .of("/Tuning/Odometry/TiltCompensation", false);
 }

@@ -62,6 +62,7 @@ public class AprilTagVisionProcessorTest {
   private final List<VisionObservation> m_accepted = new ArrayList<>();
   private ChassisVelocities m_velocities = new ChassisVelocities();
   private boolean m_singleTagEstimationEnabled = true;
+  private boolean m_submissionEnabled = true;
 
   @BeforeEach
   void freezeTheClock() {
@@ -457,6 +458,57 @@ public class AprilTagVisionProcessorTest {
         "a solve the layout can only place one tag of is a one-tag solve");
   }
 
+  // MARK: - The submission toggle
+
+  /**
+   * The switch for when vision is suspected rather than convicted: the estimate stops moving and the
+   * robot carries on under odometry, and nothing else about the loop changes.
+   */
+  @Test
+  void nothingReachesTheEstimatorWhenSubmissionIsOff() {
+    m_submissionEnabled = false;
+
+    assertFalse(
+        process(
+            fieldWithTagsAt(new Translation3d(2.0, -0.25, 0.0), new Translation3d(2.0, 0.25, 0.0)),
+            observationAt(Pose3d.ZERO, Set.of(1, 2)))
+            .isPresent(),
+        "an observation this good is still not a correction when submission is off");
+  }
+
+  /**
+   * Off is off: a frame that would otherwise have been the best of the match is withheld along with
+   * the rest, however many tags it had and however close they were.
+   */
+  @Test
+  void submissionBeingOffWithholdsEveryFrameOfABacklog() {
+    m_submissionEnabled = false;
+    m_accepted.clear();
+
+    AprilTagCameraConfig cameraIO = FAKE_CAMERA;
+
+    processor(fieldWithTagsAt(new Translation3d(1.0, -0.25, 0.0), new Translation3d(1.0, 0.25, 0.0)))
+        .process(List.of(
+            observationFrom(cameraIO, Pose3d.ZERO, Set.of(1, 2), NOW_SECONDS - 0.06),
+            observationFrom(cameraIO, Pose3d.ZERO, Set.of(1, 2), NOW_SECONDS - 0.03),
+            observationFrom(cameraIO, Pose3d.ZERO, Set.of(1, 2), NOW_SECONDS)));
+
+    assertEquals(0, m_accepted.size(), "no frame of the backlog is a correction");
+  }
+
+  /** The toggle turns off the submission and nothing else. */
+  @Test
+  void anObservationIsSubmittedAgainWhenSubmissionIsOn() {
+    m_submissionEnabled = true;
+
+    assertTrue(
+        process(
+            fieldWithTagsAt(new Translation3d(2.0, -0.25, 0.0), new Translation3d(2.0, 0.25, 0.0)),
+            observationAt(Pose3d.ZERO, Set.of(1, 2)))
+            .isPresent(),
+        "a good two-tag frame corrects the estimate when submission is on");
+  }
+
   // MARK: - Where the range comes from
 
   /**
@@ -562,7 +614,11 @@ public class AprilTagVisionProcessorTest {
    */
   private AprilTagVisionProcessor processor(Field field) {
     return new AprilTagVisionProcessor(
-        field, () -> m_velocities, () -> m_singleTagEstimationEnabled, m_accepted::add);
+        field,
+        () -> m_velocities,
+        () -> m_singleTagEstimationEnabled,
+        () -> m_submissionEnabled,
+        m_accepted::add);
   }
 
   /** Runs one observation through a processor and returns the accepted result, if there was one. */

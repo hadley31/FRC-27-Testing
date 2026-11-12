@@ -1,6 +1,11 @@
-package first.robot.mechanism.vision.apriltag;
+package first.robot.mechanism.vision.apriltag.photonvision;
 
 import org.wpilib.fields.Field;
+
+import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
+import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
+import first.robot.mechanism.vision.apriltag.AprilTagVisionFactory;
+import first.robot.mechanism.vision.apriltag.RobotHeadingSource;
 
 /**
  * Cameras read from PhotonVision coprocessors on a real robot.

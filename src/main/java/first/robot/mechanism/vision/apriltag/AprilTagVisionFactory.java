@@ -3,6 +3,9 @@ package first.robot.mechanism.vision.apriltag;
 import java.util.List;
 import java.util.Optional;
 
+import first.robot.mechanism.vision.apriltag.photonvision.AprilTagVisionFactoryPhotonVision;
+import first.robot.mechanism.vision.apriltag.photonvision.AprilTagVisionFactoryPhotonVisionSim;
+
 /**
  * One way of reading AprilTag cameras, and the seam a vendor is swapped at.
  *

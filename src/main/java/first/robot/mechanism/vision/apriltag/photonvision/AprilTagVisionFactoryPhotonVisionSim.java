@@ -1,10 +1,17 @@
-package first.robot.mechanism.vision.apriltag;
+package first.robot.mechanism.vision.apriltag.photonvision;
 
 import java.util.Optional;
 import java.util.function.Supplier;
 
 import org.wpilib.fields.Field;
 import org.wpilib.math.geometry.Pose2d;
+
+import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
+import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
+import first.robot.mechanism.vision.apriltag.AprilTagVision;
+import first.robot.mechanism.vision.apriltag.AprilTagVisionFactory;
+import first.robot.mechanism.vision.apriltag.AprilTagVisionSim;
+import first.robot.mechanism.vision.apriltag.RobotHeadingSource;
 
 /**
  * Cameras looking at a simulated field, rendered by PhotonVision's simulation tooling.
@@ -21,7 +28,7 @@ import org.wpilib.math.geometry.Pose2d;
 public class AprilTagVisionFactoryPhotonVisionSim implements AprilTagVisionFactory {
   private final Field m_field;
   private final RobotHeadingSource m_headingSource;
-  private final PhotonAprilTagVisionSim m_visionSim;
+  private final AprilTagVisionSimPhotonVision m_visionSim;
 
   /**
    * Builds the simulated field. Nothing is scheduled here: when it gets rendered, and when it hears
@@ -40,7 +47,7 @@ public class AprilTagVisionFactoryPhotonVisionSim implements AprilTagVisionFacto
       Field field, RobotHeadingSource headingSource, Supplier<Pose2d> groundTruthPoseSupplier) {
     m_field = field;
     m_headingSource = headingSource;
-    m_visionSim = new PhotonAprilTagVisionSim(field, groundTruthPoseSupplier);
+    m_visionSim = new AprilTagVisionSimPhotonVision(field, groundTruthPoseSupplier);
   }
 
   @Override

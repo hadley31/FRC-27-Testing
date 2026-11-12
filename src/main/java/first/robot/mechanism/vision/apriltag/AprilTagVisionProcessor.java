@@ -66,8 +66,8 @@ public class AprilTagVisionProcessor {
    */
   private static final Distance MAX_NEAREST_TAG_DISTANCE = Feet.of(15.0);
 
-  /** The robot is on the floor, so a solve that puts it this far above the floor is not a solve. */
-  private static final Distance MAX_DISTANCE_ABOVE_GROUND = Feet.of(1.0);
+  /** The robot is on the floor, so a solve that puts it this far off the floor is not a solve. */
+  private static final Distance MAX_DISTANCE_FROM_FLOOR = Feet.of(1.0);
 
   /**
    * A frame older than this is treated as a broken clock rather than a slow one.
@@ -76,7 +76,7 @@ public class AprilTagVisionProcessor {
    * time it was captured, against a two second odometry buffer, so an old frame is corrected in the
    * past and carried forward rather than applied as though it were current. What this catches is a
    * coprocessor whose time sync has failed, which produces timestamps that are wrong rather than
-   * late.
+   * late -- and wrong in either direction, hence the unsigned comparison at the gate.
    */
   private static final Time MAX_LATENCY = Seconds.of(0.25);
 
@@ -99,12 +99,15 @@ public class AprilTagVisionProcessor {
   // avoidable loss here. A tag pins down its bearing superbly, because half a pixel of corner noise
   // is milliradians, and its range badly, because range is inferred from apparent size and the
   // sensitivity of apparent size to range falls off as 1/d^2. So bearing error grows linearly with
-  // distance while range error grows quadratically, and by four metres the error ellipse is an order
-  // of magnitude longer along the camera bore than across it. One number for both axes has to either
+  // distance while range error grows quadratically, leaving the ellipse longer along the camera bore
+  // than across it by d * (RANGE_COEFFICIENT / BEARING_COEFFICIENT) -- four to one at four metres as
+  // the two are set below, and inverted below one metre, where the ratio of the coefficients puts
+  // the crossover. Raise the range coefficient relative to the bearing one to push that crossover
+  // below the shortest range the robot actually solves at. One number for both axes has to either
   // distrust the bearing or over-trust the range; these two coefficients are the whole model, and
   // everything after them either inflates or rotates the ellipse they describe.
 
-  /** Range error over distance squared, in 1/m. Fit this from logs; see the class-level tuning note. */
+  /** Range error over distance squared, in 1/m. A placeholder; fit it from logs. */
   private static final double RANGE_COEFFICIENT = 0.005;
 
   /** Bearing error over distance, dimensionless. Fit this from logs alongside the coefficient above. */
@@ -186,6 +189,7 @@ public class AprilTagVisionProcessor {
   private final Field m_field;
   private final Supplier<ChassisVelocities> m_robotVelocitiesSupplier;
   private final BooleanSupplier m_singleTagEstimationEnabled;
+  private final BooleanSupplier m_submissionEnabled;
   private final Consumer<VisionObservation> m_observationConsumer;
 
   /**
@@ -213,16 +217,25 @@ public class AprilTagVisionProcessor {
    *                                rejected and the robot runs on multi-tag frames and odometry,
    *                                which is the configuration to reach for when the estimate is
    *                                being pulled about by a camera that can only ever see one tag.
+   * @param submissionEnabled       whether accepted observations reach the pose estimator at all.
+   *                                Off, every frame is still evaluated, priced and logged, and none
+   *                                of it moves the estimate -- which is what makes this the switch
+   *                                to reach for when vision is suspected rather than known to be at
+   *                                fault, since the log still shows what each frame would have been
+   *                                worth and the robot meanwhile runs on odometry. On the robot pass
+   *                                {@code Tuning.kEnableVisionObservations}.
    * @param observationConsumer     where accepted observations go
    */
   public AprilTagVisionProcessor(
       Field field,
       Supplier<ChassisVelocities> robotVelocitiesSupplier,
       BooleanSupplier singleTagEstimationEnabled,
+      BooleanSupplier submissionEnabled,
       Consumer<VisionObservation> observationConsumer) {
     m_field = field;
     m_robotVelocitiesSupplier = robotVelocitiesSupplier;
     m_singleTagEstimationEnabled = singleTagEstimationEnabled;
+    m_submissionEnabled = submissionEnabled;
     m_observationConsumer = observationConsumer;
   }
 
@@ -241,7 +254,10 @@ public class AprilTagVisionProcessor {
       SolveGeometry geometry = SolveGeometry.of(m_field, observation);
       Result result = processObservation(observation, geometry);
 
-      if (result instanceof Accepted accepted) {
+      // Checked here rather than before the loop, so that switching submission off costs the log
+      // nothing: every frame is still evaluated and still priced, and the error model stays as
+      // observable with vision cut out of the estimate as with it in.
+      if (result instanceof Accepted accepted && m_submissionEnabled.getAsBoolean()) {
         submitAcceptedObservation(accepted);
       }
 
@@ -272,9 +288,12 @@ public class AprilTagVisionProcessor {
       return new SingleTagDisabledRejection(observation);
     }
 
-    Distance heightAboveGround = observation.observedRobotPose().getMeasureZ();
-    if (heightAboveGround.gt(MAX_DISTANCE_ABOVE_GROUND)) {
-      return new PoseHeightRejection(observation, heightAboveGround);
+    // Unsigned, and read from the geometry so that the gate and the penalty below cannot disagree
+    // about what a height error is. The robot being on the floor rules out a solve beneath it
+    // exactly as firmly as one above it, and a signed comparison waves the first one through.
+    Distance heightError = Meters.of(geometry.heightErrorMeters());
+    if (heightError.gt(MAX_DISTANCE_FROM_FLOOR)) {
+      return new PoseHeightRejection(observation, heightError);
     }
 
     Distance nearestTagDistance = Meters.of(geometry.nearestRangeMeters());
@@ -287,8 +306,11 @@ public class AprilTagVisionProcessor {
       return new ReprojectionErrorRejection(observation, observation.reprojectionErrorPixels());
     }
 
+    // Compared without its sign, because a timestamp from the future is the failed time sync this
+    // gate exists to catch and a signed comparison reads it as the freshest frame of the loop. The
+    // rejection carries the signed value, so the log still shows which way the clock is wrong.
     Time latency = observation.latency();
-    if (latency.gt(MAX_LATENCY)) {
+    if (latency.abs(Seconds) > MAX_LATENCY.in(Seconds)) {
       return new LatencyRejection(observation, latency);
     }
 
@@ -319,7 +341,7 @@ public class AprilTagVisionProcessor {
     sigmaBearing = Math.hypot(sigmaBearing, irreducible);
 
     // Rotate the ellipse out of (range, bearing) and into the field frame: this is the diagonal of
-    // R * Sigma * R^T, taken about the bearing from the robot to the tags. The off-diagonal term the
+    // R * Sigma * R^T, taken about the bearing from the lens to the tags. The off-diagonal term the
     // estimator's interface cannot carry is dropped rather than approximated, which loses the
     // correlation between x and y and so errs toward distrust rather than toward confidence.
     //
@@ -434,16 +456,18 @@ public class AprilTagVisionProcessor {
    *
    * @param tagPoses             where the layout puts each tag the solve used, in the order the
    *                             observation listed them, and only the ones the layout knows -- which
-   *                             can be fewer than the solve claimed to use. Every scalar below is
-   *                             derived from these, and {@code tagCount} is their number, so the two
-   *                             cannot drift apart.
+   *                             can be fewer than the solve claimed to use. {@code tagCount} is
+   *                             their number, and every scalar below describes these same tags: the
+   *                             three distances are the camera's own measurements only when the
+   *                             layout knows every tag it solved from, and are derived from these
+   *                             poses otherwise, so the two cannot drift apart.
    * @param nearestRangeMeters   how far away the closest of them was
    * @param rangeDistanceMeters  the effective distance for range error; see
    *                             {@link #effectiveDistance}
    * @param bearingDistanceMeters the effective distance for bearing error
    * @param incidenceCosine      how square-on the tags were, 1 face-on, clamped from below
    * @param tagSpreadMeters      the widest separation between any two tags used
-   * @param tagBearing           field-relative direction from the robot to the tags, the axis the
+   * @param tagBearing           field-relative direction from the lens to the tags, the axis the
    *                             error ellipse is aligned with
    * @param heightErrorMeters    how far above the floor the solve put the robot
    * @param tiltErrorRadians     how far from level the solve put the robot
@@ -497,7 +521,17 @@ public class AprilTagVisionProcessor {
       // is a last resort rather than the normal path: those agree with the pose they came from
       // however wrong it is, so a solve that has gone astray prices itself as though it had not --
       // and a flipped one, landing nearer a tag than it really is, would be rewarded for it.
-      double[] ranges = observation.measuredTagRanges().length > 0
+      //
+      // Taken only when the layout knows every tag the solve used. The camera reports a range per
+      // tag it solved from while tagPoses holds just the ones this layout knows, and where those
+      // sets differ the two halves of this record describe different tags: an off-layout tag at
+      // arm's length would set the nearest range and both effective distances for a solve made from
+      // a tag across the field, and the distance gate would pass it. That disagreement about which
+      // field this is belongs to UnknownTagRejection, not to the error model. Fewer measured ranges
+      // than tags is a different thing and is left alone -- the camera omits a tag whose transform
+      // it could not supply, and a subset of layout-known tags only ever reads as further away and
+      // less certain than the whole.
+      double[] ranges = observation.measuredTagRanges().length > 0 && tagPoses.size() == observation.tags().size()
           ? observation.measuredTagRanges()
           : tagPoses.stream()
               .mapToDouble(tag -> tag.getTranslation().getDistance(cameraPose.getTranslation()))
@@ -510,7 +544,7 @@ public class AprilTagVisionProcessor {
           effectiveDistance(ranges, BEARING_VARIANCE_POWER),
           AprilTagVisionProcessor.incidenceCosine(tagPoses, cameraPose),
           tagSpread(tagPoses),
-          bearingTo(tagPoses, robotPose),
+          bearingTo(tagPoses, cameraPose),
           heightError,
           tiltError);
     }
@@ -589,19 +623,27 @@ public class AprilTagVisionProcessor {
   }
 
   /**
-   * The field-relative direction from the robot to the centre of the tags it was solved from.
+   * The field-relative direction from the lens to the centre of the tags it was solved from.
    *
-   * <p>Undefined if the solve put the robot exactly on that centre, in which case the axis the
-   * ellipse is aligned with does not matter: the robot is inside the tag, every range is at the
+   * <p>From the lens rather than the robot origin, because the ellipse this aligns is a camera
+   * measurement: its long axis is the line of sight the range was inferred along, and the robot pose
+   * is that camera pose through a rigid known transform, which moves the ellipse without turning it.
+   * Taking the bearing from the robot origin instead rotates the ellipse by the parallax between the
+   * two origins, {@code asin(offset / range)} -- a sixth of a radian for a lens a third of a metre
+   * out looking at a tag a metre away, which is exactly the close range where a mispriced ellipse
+   * does the most damage.
+   *
+   * <p>Undefined if the solve put the lens exactly on that centre, in which case the axis the
+   * ellipse is aligned with does not matter: the camera is inside the tag, every range is at the
    * systematic floor, and the ellipse is round.
    */
-  private static Rotation2d bearingTo(List<Pose3d> tagPoses, Pose3d robotPose) {
+  private static Rotation2d bearingTo(List<Pose3d> tagPoses, Pose3d cameraPose) {
     Translation2d centroid = tagPoses.stream()
         .map(tag -> tag.getTranslation().toTranslation2d())
         .reduce(Translation2d.ZERO, Translation2d::plus)
         .div(tagPoses.size());
 
-    return centroid.minus(robotPose.getTranslation().toTranslation2d())
+    return centroid.minus(cameraPose.getTranslation().toTranslation2d())
         .getAngle()
         .orElse(Rotation2d.ZERO);
   }
@@ -651,11 +693,11 @@ public class AprilTagVisionProcessor {
   }
 
   public final record PoseHeightRejection(AprilTagPoseObservation observation,
-      Distance distanceAboveGround)
+      Distance distanceFromFloor)
       implements Rejected {
     @Override
     public String reason() {
-      return "Observed position too elevated: " + distanceAboveGround.toShortString();
+      return "Observed position too far off the floor: " + distanceFromFloor.toShortString();
     }
   }
 

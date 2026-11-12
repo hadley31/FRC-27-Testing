@@ -96,6 +96,7 @@ public class RobotState {
         field,
         m_drive::getRobotRelativeSpeeds,
         Tuning.kSingleTagEstimation,
+        Tuning.kEnableVisionObservations,
         m_poseEstimator::addVisionObservation);
 
     m_inAllianceZoneTrigger = new Trigger(this::inAllianceZone)

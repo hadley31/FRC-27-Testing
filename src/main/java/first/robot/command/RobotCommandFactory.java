@@ -4,6 +4,7 @@ import static org.wpilib.units.Units.Degrees;
 import static org.wpilib.units.Units.DegreesPerSecond;
 import static org.wpilib.units.Units.RPM;
 
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.Logger;
@@ -40,8 +41,9 @@ public class RobotCommandFactory {
   /** How close the chassis heading must be, in fixed-turret mode, before fuel is fed. */
   private static final Angle kChassisAimTolerance = Degrees.of(2.0);
 
+  /** How fast the rollers pull fuel in, and in reverse how fast they spit it back out. */
   private static final LoggedTunableMeasure<AngularVelocity> kIntakeRollerSpeed = LoggedTunableMeasure
-      .of("Intake/RollerSpeed", RPM.of(1000));
+      .of("/Tuning/Intake/RollerSpeed", RPM.of(1000));
 
   /**
    * How slowly the chassis must be turning before its aim is believed.
@@ -202,21 +204,47 @@ public class RobotCommandFactory {
     var goal = new ChassisAimGoal();
 
     return Command.noRequirements(coroutine -> {
-      // The chassis term is what keeps fixed-turret mode from feeding mid-swing: the turret reports
-      // "on target" the instant it reaches its parked angle, which says nothing at all about where
-      // the robot is pointed.
-      m_robot.state.isPreparedToShootTrigger()
-          .and(() -> goal.isAimed(
-              m_robot.state.getRobotPose().getRotation(),
-              // Robot-relative, since a rotation rate is the same number in either frame and the
-              // field-relative accessor would rotate two translations to arrive at it.
-              DegreesPerSecond.of(Math.toDegrees(m_robot.state.getRobotRelativeSpeeds().omega)),
-              kChassisAimTolerance,
-              kChassisAimSettledRate))
-          .whileTrue(feedFuel());
+      // Forked rather than bound to a trigger. A binding made in here would schedule the feed
+      // against the scheduler's own event loop, which is polled outside command execution, so the
+      // feed would go on the queue with this command recorded as its parent. If this command loses
+      // the chassis in the window between being queued and being promoted -- which is a single
+      // mechanism conflict away -- the feed is promoted with a parent that is already gone, and
+      // nothing in the scheduler is looking for it. Forking starts it as a child of this command
+      // directly, so it is cancelled along with this command instead of outliving it.
+      coroutine.fork(feedWhileAimed(goal));
 
       coroutine.await(autoAim(goal));
     }).named("Auto Shoot");
+  }
+
+  /**
+   * Feeds fuel for as long as the shot is on, and stops the moment it is not.
+   *
+   * <p>The chassis term is what keeps fixed-turret mode from feeding mid-swing: the turret reports
+   * "on target" the instant it reaches its parked angle, which says nothing at all about where the
+   * robot is pointed.
+   *
+   * @param goal the aim the shot is being taken against
+   * @return the command, meant to be forked by {@link #autoAimAndShoot()} rather than scheduled on
+   *     its own.
+   */
+  private Command feedWhileAimed(ChassisAimGoal goal) {
+    BooleanSupplier onTarget = () -> m_robot.state.isPreparedToShootTrigger().getAsBoolean()
+        && goal.isAimed(
+            m_robot.state.getRobotPose().getRotation(),
+            // Robot-relative, since a rotation rate is the same number in either frame and the
+            // field-relative accessor would rotate two translations to arrive at it.
+            DegreesPerSecond.of(Math.toDegrees(m_robot.state.getRobotRelativeSpeeds().omega)),
+            kChassisAimTolerance,
+            kChassisAimSettledRate);
+
+    return Command.noRequirements(coroutine -> {
+      while (true) {
+        coroutine.waitUntil(onTarget);
+        coroutine.await(
+            feedFuel().until(() -> !onTarget.getAsBoolean()).named("Feed While Aimed"));
+      }
+    }).named("Feed When Aimed");
   }
 
   // MARK: - Turret

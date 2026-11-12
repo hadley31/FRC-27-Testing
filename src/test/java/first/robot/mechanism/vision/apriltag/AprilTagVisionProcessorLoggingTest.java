@@ -87,8 +87,11 @@ class AprilTagVisionProcessorLoggingTest {
         new Translation3d(4.0, 0.0, 0.0));
 
     List<VisionObservation> accepted = new ArrayList<>();
-    AprilTagVisionProcessor processor =
-        new AprilTagVisionProcessor(field, ChassisVelocities::new, () -> true, accepted::add);
+    // Mutable so the last loop below can run with submission switched off; a local would not be
+    // assignable from the supplier.
+    boolean[] submissionEnabled = {true};
+    AprilTagVisionProcessor processor = new AprilTagVisionProcessor(
+        field, ChassisVelocities::new, () -> true, () -> submissionEnabled[0], accepted::add);
 
     RecordingReceiver receiver = new RecordingReceiver();
     Logger.AdvancedHooks.disableRobotBaseCheck();
@@ -121,15 +124,23 @@ class AprilTagVisionProcessorLoggingTest {
       loop(() -> processor.process(List.of(
           observation(CAMERA, Pose3d.ZERO, Set.of(1), now()),
           observation(OTHER_CAMERA, Pose3d.ZERO, Set.of(3), now()))));
+
+      // A good frame with submission switched off, which is the configuration the log has to keep
+      // describing: the whole value of that switch is that it answers whether vision was the
+      // problem, and it can only answer while the frames it withholds are still priced and logged.
+      submissionEnabled[0] = false;
+      loop(() -> processor.process(List.of(
+          observation(CAMERA, Pose3d.ZERO, Set.of(1), now()))));
     } finally {
       // Entries are handed to receivers on a separate thread; end() joins it.
       Logger.end();
     }
 
-    assertEquals(5, receiver.entries.size(), "expected one flushed entry per simulated loop");
+    assertEquals(6, receiver.entries.size(), "expected one flushed entry per simulated loop");
 
     // Three from the backlog, one of the two mixed verdicts, none from the two stale ones, none from
-    // the silent loop, two from the two cameras. Thinning the log never thins what the filter gets.
+    // the silent loop, two from the two cameras, and none from the loop with submission off.
+    // Thinning the log never thins what the filter gets.
     assertEquals(6, accepted.size(), "every frame that passed the gates should have been submitted");
 
     LogTable backlog = receiver.entries.get(0);
@@ -137,6 +148,7 @@ class AprilTagVisionProcessorLoggingTest {
     LogTable allRejected = receiver.entries.get(2);
     LogTable silent = receiver.entries.get(3);
     LogTable twoCameras = receiver.entries.get(4);
+    LogTable withheld = receiver.entries.get(5);
 
     // MARK: - A backlog is counted in full and described by its newest frame
 
@@ -233,6 +245,26 @@ class AprilTagVisionProcessorLoggingTest {
     assertEquals(1.65, number(twoCameras, "FakeCamera/MostRecent/RangeDistance"), 1.0e-6);
     assertEquals(3.65, number(twoCameras, "OtherCamera/MostRecent/RangeDistance"), 1.0e-6,
         "the second camera's frame should be its own, not the first camera's");
+
+    // MARK: - A withheld frame is still a judged frame
+
+    // The toggle gates the submission and not the verdict, so the log of a loop with vision switched
+    // out is indistinguishable from one with it in. That is what makes the switch diagnostic rather
+    // than merely a mute button: the coefficients can be fitted from a match run with it off.
+    assertEquals(1, withheld.get(kPrefix + "FakeCamera/ObservationCount", -1),
+        "a withheld frame is still a frame the camera reported");
+    assertEquals(1, withheld.get(kPrefix + "FakeCamera/AcceptedCount", -1),
+        "withholding a frame is not rejecting it");
+    assertTrue(withheld.get(kPrefix + "FakeCamera/MostRecent/Accepted", false));
+    assertEquals("", withheld.get(kPrefix + "FakeCamera/MostRecent/RejectionReason", "?"),
+        "a frame that passed every gate has no rejection to report");
+    assertEquals(1.65, number(withheld, "FakeCamera/MostRecent/RangeDistance"), 1.0e-6,
+        "the geometry a withheld frame was priced from is still logged");
+    assertFalse(Double.isNaN(number(withheld, "FakeCamera/MostRecent/StdDevs/X")),
+        "a withheld frame is priced, so the model stays observable with vision switched out");
+    assertArrayEquals(new Pose3d[] {Pose3d.ZERO},
+        withheld.get(kPrefix + "FakeCamera/AcceptedRobotPoses", new Pose3d[0]),
+        "the pose is still drawn, so the log shows where vision would have put the robot");
   }
 
   // MARK: - Fixtures

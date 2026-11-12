@@ -1,4 +1,4 @@
-package first.robot.mechanism.vision.apriltag;
+package first.robot.mechanism.vision.apriltag.photonvision;
 
 import java.util.function.Supplier;
 
@@ -7,6 +7,8 @@ import org.photonvision.simulation.VisionSystemSim;
 import org.wpilib.fields.Field;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Transform3d;
+
+import first.robot.mechanism.vision.apriltag.AprilTagVisionSim;
 
 /**
  * An {@link AprilTagVisionSim} rendered by PhotonVision's simulation tooling.
@@ -21,7 +23,7 @@ import org.wpilib.math.geometry.Transform3d;
  * results in simulation through exactly the code it uses on the robot; only the construction
  * differs.
  */
-public class PhotonAprilTagVisionSim implements AprilTagVisionSim {
+public class AprilTagVisionSimPhotonVision implements AprilTagVisionSim {
   private final VisionSystemSim m_sim;
   private final Supplier<Pose2d> m_groundTruthPoseSupplier;
 
@@ -34,7 +36,7 @@ public class PhotonAprilTagVisionSim implements AprilTagVisionSim {
    *                                with the correction by construction, and the filter above can
    *                                never be wrong, or right.
    */
-  public PhotonAprilTagVisionSim(Field field, Supplier<Pose2d> groundTruthPoseSupplier) {
+  public AprilTagVisionSimPhotonVision(Field field, Supplier<Pose2d> groundTruthPoseSupplier) {
     m_sim = new VisionSystemSim("main");
     m_sim.addAprilTags(field);
     m_groundTruthPoseSupplier = groundTruthPoseSupplier;

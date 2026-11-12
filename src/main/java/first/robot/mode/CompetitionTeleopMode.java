@@ -29,7 +29,7 @@ import first.robot.util.SwerveInputStream;
  * not at all. So the button bindings are made from inside {@link #m_teleopCommand} instead, where
  * they are scoped to that command's run and dropped with it.
  */
-@Teleop(name = "Competition")
+@Teleop(name = "Competition Teleop")
 public class CompetitionTeleopMode extends PeriodicOpMode {
   private final Robot m_robot;
   private final CompetitionDriverControls m_driverControls;

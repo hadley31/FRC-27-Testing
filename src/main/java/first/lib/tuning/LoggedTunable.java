@@ -111,9 +111,9 @@ public abstract sealed class LoggedTunable<T> extends LoggedNetworkInput
       LoggedTunableCodec<T> codec,
       boolean persistent,
       boolean register) {
-    if (!path.startsWith("/") || path.endsWith("/")) {
+    if (path.endsWith("/")) {
       throw new IllegalArgumentException(
-          "A tunable path must be absolute and name a topic, got: '" + path + "'");
+          "A logged tunable path must not end in a '/'");
     }
 
     m_path = path;

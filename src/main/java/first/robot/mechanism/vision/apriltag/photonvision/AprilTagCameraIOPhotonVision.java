@@ -1,4 +1,4 @@
-package first.robot.mechanism.vision.apriltag;
+package first.robot.mechanism.vision.apriltag.photonvision;
 
 import static org.wpilib.units.Units.Seconds;
 
@@ -20,6 +20,11 @@ import org.wpilib.fields.Field;
 import org.wpilib.math.geometry.Pose3d;
 import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.system.RobotController;
+
+import first.robot.mechanism.vision.apriltag.AprilTagCameraConfig;
+import first.robot.mechanism.vision.apriltag.AprilTagCameraIO;
+import first.robot.mechanism.vision.apriltag.AprilTagCameraIOInputsAutoLogged;
+import first.robot.mechanism.vision.apriltag.RobotHeadingSource;
 
 public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
   /**
@@ -66,7 +71,7 @@ public class AprilTagCameraIOPhotonVision implements AprilTagCameraIO {
       AprilTagCameraConfig config,
       Field field,
       RobotHeadingSource headingSource,
-      PhotonAprilTagVisionSim visionSim) {
+      AprilTagVisionSimPhotonVision visionSim) {
     AprilTagCameraIOPhotonVision io = new AprilTagCameraIOPhotonVision(config, field, headingSource);
     visionSim.addCamera(
         new PhotonCameraSim(io.m_camera, simulatedCameraProperties(), field), config.robotToCamera());
