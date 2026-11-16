@@ -12,11 +12,77 @@ import org.wpilib.units.Measure;
 
 import first.lib.tuning.TunableCommand;
 import first.lib.tuning.TuningState;
-import first.lib.tuning.TuningStateCache;
 import first.lib.util.UnitDoubleConverter;
 
-public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInputs, U extends Measure<?>>
-    extends Mechanism, LoggedComponent<T, I> {
+/**
+ * A mechanism driven to a single measured quantity -- an angle, a position, a speed -- through one
+ * IO layer.
+ *
+ * <p>A class rather than an interface, which is what lets it hold the three things every mechanism
+ * has: its IO, its inputs, and its tuning state. Those used to be a field and a {@code getIO()}
+ * override repeated in every mechanism, plus an identity-keyed cache standing in for the field a
+ * tuning state could not have. A subclass now declares what it is and nothing else; see
+ * {@code Turret}.
+ *
+ * <p>The constructor wires the mechanism up as well as building it -- the inputs are refreshed every
+ * loop and the tuning command is published -- so the registration cannot be left out of a new
+ * mechanism by forgetting a line. That does hand {@code this} to the scheduler and to
+ * {@link Tunables} before the subclass's own constructor has run, which is safe here because
+ * nothing dereferences it until the scheduler first runs: a periodic callback and a published
+ * tunable are both read later. A subclass whose {@link #getName()} depended on its own fields would
+ * break that, which is reason enough not to write one.
+ *
+ * @param <T> the IO interface this mechanism talks to
+ * @param <I> the inputs class {@code T} populates
+ * @param <U> the measure this mechanism is commanded in
+ */
+public abstract class G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInputs, U extends Measure<?>>
+    implements Mechanism, LoggedComponent<T, I> {
+  private final T m_io;
+  private final I m_inputs;
+  private final UnitDoubleConverter<U> m_measureType;
+  private final TuningState<U> m_tuningState;
+
+  /**
+   * @param io the IO layer to command and read
+   * @param inputs the inputs object {@code io} fills, supplied by the subclass for its dimension
+   * @param measureType the unit this mechanism is tuned in -- passed rather than left to an
+   *     overridable method, because the tuning state built below needs it before a subclass
+   *     constructor could have set anything
+   */
+  protected G3Mechanism(T io, I inputs, UnitDoubleConverter<U> measureType) {
+    m_io = io;
+    m_inputs = inputs;
+    m_measureType = measureType;
+    m_tuningState = new TuningState<>(getName(), measureType);
+
+    getRegisteredScheduler().addPeriodic(this::update);
+
+    // The tuning state owns the refresh of its own values rather than letting AdvantageKit refresh
+    // them one at a time, so a cycle never hands the controller a setpoint from this loop and gains
+    // from the last. Sideloaded callbacks run before any command in the same Scheduler.run(), which
+    // is what makes that refresh land ahead of the tuning command that reads it.
+    getRegisteredScheduler().addPeriodic(m_tuningState::periodic);
+
+    // Published at Tuning/Commands/<mechanism name>, so every mechanism's button sits together in
+    // one place, under the same word as the setpoint and gains the button exists to exercise. It
+    // replaces the commands v2 SmartDashboard.putData a command could once be handed to directly;
+    // see TunableCommand for why the binding has to be written out in v3.
+    Tunables.publish(
+        "Tuning/Commands/%s".formatted(getName()),
+        new TunableCommand(tuningCommand(), getRegisteredScheduler()));
+  }
+
+  @Override
+  public final T getIO() {
+    return m_io;
+  }
+
+  @Override
+  public final I getInputs() {
+    return m_inputs;
+  }
+
   /**
    * Resolves the two inherited defaults, which Java will not pick between: {@link Mechanism} and
    * {@link LoggedComponent} each supply a {@code getName()}. They agree -- both are the class's
@@ -24,7 +90,7 @@ public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInput
    * from, so that is the one deferred to here.
    */
   @Override
-  public default String getName() {
+  public String getName() {
     return Mechanism.super.getName();
   }
 
@@ -34,7 +100,7 @@ public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInput
    * @return {@code this}
    */
   @Override
-  public default G3Mechanism<T, I, U> getMechanism() {
+  public final G3Mechanism<T, I, U> getMechanism() {
     return this;
   }
 
@@ -43,59 +109,59 @@ public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInput
    * component with an owner -- which here is the same name twice.
    */
   @Override
-  public default String getLogPrefix() {
+  public String getLogPrefix() {
     return getName();
   }
 
-  public U getCurrentMeasurement();
+  public abstract U getCurrentMeasurement();
 
-  public U getTarget();
+  public abstract U getTarget();
 
-  public void setTarget(U target);
+  public abstract void setTarget(U target);
 
-  public default void halt() {
+  public void halt() {
     getIO().halt();
   }
 
-  public boolean isNear(U measure, U tolerance);
+  public abstract boolean isNear(U measure, U tolerance);
 
-  public default boolean isNear(U measure) {
+  public boolean isNear(U measure) {
     return isNear(measure, getDefaultTolerance());
   }
 
-  public default boolean isNearTarget(U tolerance) {
+  public boolean isNearTarget(U tolerance) {
     return isNear(getTarget(), tolerance);
   }
 
-  public default boolean isNearTarget() {
+  public boolean isNearTarget() {
     return isNearTarget(getDefaultTolerance());
   }
 
-  public default Trigger isNearTargetTrigger(U tolerance) {
+  public Trigger isNearTargetTrigger(U tolerance) {
     return new Trigger(() -> isNearTarget(tolerance));
   }
 
-  public default Trigger isNearTargetTrigger() {
+  public Trigger isNearTargetTrigger() {
     return isNearTargetTrigger(getDefaultTolerance());
   }
 
-  public default Trigger isNearTrigger(Supplier<U> targetSupplier, U tolerance) {
+  public Trigger isNearTrigger(Supplier<U> targetSupplier, U tolerance) {
     return new Trigger(() -> isNear(targetSupplier.get(), tolerance));
   }
 
-  public default Trigger isNearTrigger(U target, U tolerance) {
+  public Trigger isNearTrigger(U target, U tolerance) {
     return isNearTrigger(() -> target, tolerance);
   }
 
-  public default Trigger isNearTrigger(Supplier<U> targetSupplier) {
+  public Trigger isNearTrigger(Supplier<U> targetSupplier) {
     return isNearTrigger(targetSupplier, getDefaultTolerance());
   }
 
-  public default Trigger isNearTrigger(U target) {
+  public Trigger isNearTrigger(U target) {
     return isNearTrigger(() -> target, getDefaultTolerance());
   }
 
-  public default NeedsNameBuilderStage setTargetCommand(Supplier<U> targetSupplier) {
+  public NeedsNameBuilderStage setTargetCommand(Supplier<U> targetSupplier) {
     return run(coroutine -> {
       while (true) {
         setTarget(targetSupplier.get());
@@ -104,20 +170,20 @@ public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInput
     });
   }
 
-  public default NeedsNameBuilderStage setTargetCommand(U target) {
+  public NeedsNameBuilderStage setTargetCommand(U target) {
     return setTargetCommand(() -> target);
   }
 
-  public default Command haltCommand() {
+  public Command haltCommand() {
     return run(coroutine -> {
       halt();
       coroutine.park();
     }).named("Halt %s".formatted(getName()));
   }
 
-  public U getDefaultTolerance();
+  public abstract U getDefaultTolerance();
 
-  public default Command tuningCommand() {
+  public Command tuningCommand() {
     TuningState<U> tuning = getTuningState();
 
     return run(coroutine -> {
@@ -145,39 +211,15 @@ public interface G3Mechanism<T extends G3MechanismIO<I>, I extends LoggableInput
    * The unit this mechanism's measurements are tuned in: whatever a person wants to read and type on
    * a dashboard, which is not necessarily the unit the inputs are logged in.
    *
-   * <p>Supplied by the unit-specialized interfaces -- {@code AngleMechanism} and friends -- alongside
+   * <p>Supplied by the unit-specialized subclasses -- {@code AngleMechanism} and friends -- alongside
    * the default tolerance, since both are properties of the dimension rather than of the mechanism.
    */
-  public UnitDoubleConverter<U> getMeasureType();
-
-  /**
-   * This mechanism's published setpoint and gains.
-   *
-   * <p>Created on first call and cached per mechanism; see {@link TuningStateCache} for why that
-   * matters.
-   */
-  public default TuningState<U> getTuningState() {
-    return TuningStateCache.getOrCreate(this, getMeasureType());
+  public final UnitDoubleConverter<U> getMeasureType() {
+    return m_measureType;
   }
 
-  /**
-   * Publishes this mechanism's {@link #tuningCommand()} as a dashboard button, at {@code
-   * Tuning/Commands/<mechanism name>} -- so every mechanism's button sits together in one place, under the
-   * same word as the setpoint and gains the button exists to exercise.
-   *
-   * <p>Call this from the mechanism's constructor. It replaces the commands v2 {@code
-   * SmartDashboard.putData} that a command could once be handed to directly; see {@link
-   * TunableCommand} for why the binding has to be written out in v3.
-   */
-  public default void registerTuningCommand() {
-    // The tuning state owns the refresh of its own values rather than letting AdvantageKit refresh
-    // them one at a time, so a cycle never hands the controller a setpoint from this loop and gains
-    // from the last. Sideloaded callbacks run before any command in the same Scheduler.run(), which
-    // is what makes that refresh land ahead of the tuning command that reads it.
-    getRegisteredScheduler().addPeriodic(getTuningState()::periodic);
-
-    Tunables.publish(
-        "Tuning/Commands/%s".formatted(getName()),
-        new TunableCommand(tuningCommand(), getRegisteredScheduler()));
+  /** This mechanism's published setpoint and gains. */
+  public final TuningState<U> getTuningState() {
+    return m_tuningState;
   }
 }

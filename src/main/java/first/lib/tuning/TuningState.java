@@ -70,7 +70,7 @@ public class TuningState<U extends Measure<?>> {
   /**
    * Refreshes the setpoint and the gains from NetworkTables, or from the log during replay.
    *
-   * <p>Call once per loop, before anything reads either. {@code G3Mechanism.registerTuningCommand}
+   * <p>Call once per loop, before anything reads either. The {@code G3Mechanism} constructor
    * arranges this, and the ordering is load-bearing: {@code Scheduler} runs
    * {@code addPeriodic} callbacks before it runs any command, so the tuning command always reads
    * values refreshed in the same cycle rather than the previous one's.

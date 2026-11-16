@@ -1,5 +1,7 @@
 package first.lib.mechanism.angle;
 
+import static org.wpilib.units.Units.Rotations;
+
 import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 
@@ -20,6 +22,17 @@ public class TalonFXAngleMechanismIO implements AngleMechanismIO {
 
   private final PositionTorqueCurrentFOC m_control;
 
+  /**
+   * The rotor reading that counts as zero.
+   *
+   * <p>Kept and applied in software rather than written into the Talon, which is what
+   * {@link #setZeroOffset} asks for: a {@code setPosition} or a magnet-offset config is a blocking
+   * CAN write, and this arrives whenever someone edits the stored value. It also keeps the offset in
+   * one place -- a seeded encoder would disagree with the stored number the moment the Talon
+   * rebooted and came back up at whatever it was reading.
+   */
+  private Angle m_zeroOffset = Rotations.of(0);
+
   public TalonFXAngleMechanismIO(int port, CANBus bus) {
     m_motor = new TalonFX(port, bus);
     m_position = m_motor.getPosition();
@@ -30,14 +43,29 @@ public class TalonFXAngleMechanismIO implements AngleMechanismIO {
   @Override
   public void updateInputs(AngleMechanismInputsAutoLogged inputs) {
     BaseStatusSignal.refreshAll(m_position, m_angularVelocity);
-    inputs.currentAngle = m_position.getValue();
+    // Both angles reported in the zeroed frame; the velocity needs no offset, since moving the
+    // frame does not change how fast the rotor is turning.
+    inputs.currentAngle = m_position.getValue().minus(m_zeroOffset);
     inputs.currentAngularVelocity = m_angularVelocity.getValue();
-    inputs.targetAngle = m_control.getPositionMeasure();
+    inputs.targetAngle = m_control.getPositionMeasure().minus(m_zeroOffset);
   }
 
   @Override
   public void setTargetAngle(Angle angle) {
-    m_motor.setControl(m_control.withPosition(angle));
+    m_motor.setControl(m_control.withPosition(angle.plus(m_zeroOffset)));
+  }
+
+  @Override
+  public Angle zero() {
+    // The signal as refreshed by the last updateInputs, which is this loop's: refreshing again here
+    // would be a second CAN read for a value already in hand.
+    m_zeroOffset = m_position.getValue();
+    return m_zeroOffset;
+  }
+
+  @Override
+  public void setZeroOffset(Angle offset) {
+    m_zeroOffset = offset;
   }
 
   @Override

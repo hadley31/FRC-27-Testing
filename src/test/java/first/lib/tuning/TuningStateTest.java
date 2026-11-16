@@ -3,8 +3,6 @@ package first.lib.tuning;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.wpilib.units.Units.Degrees;
@@ -16,7 +14,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.wpilib.command3.Mechanism;
 import org.wpilib.networktables.MultiSubscriber;
 import org.wpilib.networktables.NetworkTableInstance;
 
@@ -28,13 +25,6 @@ import first.lib.util.UnitDoubleConverter;
  * are still there after a reboot, and a gain edit is reported for exactly one loop.
  */
 class TuningStateTest {
-  /** Named for its paths: {@code getName()} on a mechanism is its class's simple name. */
-  private static final class Thing implements Mechanism {
-  }
-
-  private static final class OtherThing implements Mechanism {
-  }
-
   private static MultiSubscriber s_subAll;
 
   @BeforeAll
@@ -52,15 +42,12 @@ class TuningStateTest {
 
   @AfterEach
   void tearDown() {
-    // Both, together. A cached state across a registry reset holds paths the registry has forgotten,
-    // and a registry reset without clearing the cache leaves the next test colliding with it.
-    TuningStateCache.clear();
     LoggedTunables.reset();
   }
 
   @Test
   void aSetpointGivenInAnotherUnitIsConvertedIntoThePublishedOne() {
-    var state = TuningStateCache.getOrCreate(new Thing(), UnitDoubleConverter.DEGREES);
+    var state = new TuningState<>("Thing", UnitDoubleConverter.DEGREES);
 
     state.setSetpoint(Rotations.of(0.5));
     state.periodic();
@@ -69,12 +56,8 @@ class TuningStateTest {
   }
 
   @Test
-  void aMechanismGetsOneStateHoweverOftenItIsAskedFor() {
-    Thing thing = new Thing();
-
-    assertSame(
-        TuningStateCache.getOrCreate(thing, UnitDoubleConverter.DEGREES),
-        TuningStateCache.getOrCreate(thing, UnitDoubleConverter.DEGREES));
+  void aStateClaimsItsPathsUnderTheNameItWasGiven() {
+    new TuningState<>("Thing", UnitDoubleConverter.DEGREES);
 
     assertTrue(
         NetworkTableInstance.getDefault().getDoubleTopic("/Tuning/Thing/kP").exists(),
@@ -82,18 +65,13 @@ class TuningStateTest {
   }
 
   @Test
-  void twoMechanismsEachGetTheirOwn() {
-    assertNotSame(
-        TuningStateCache.getOrCreate(new Thing(), UnitDoubleConverter.DEGREES),
-        TuningStateCache.getOrCreate(new OtherThing(), UnitDoubleConverter.DEGREES));
-  }
-
-  @Test
   void aSecondStateForTheSameNameIsRejected() {
-    TuningStateCache.getOrCreate(new Thing(), UnitDoubleConverter.DEGREES);
+    new TuningState<>("Thing", UnitDoubleConverter.DEGREES);
 
-    // The reason the cache exists. Two states under one name would share every path, so two
-    // instances of a mechanism would silently share one kP -- a bug you find on the field.
+    // Two states under one name would share every path, so two instances of a mechanism would
+    // silently share one kP -- a bug you find on the field. Each mechanism holding its own state as
+    // a field is what makes one per mechanism the only thing you can write; this is the backstop for
+    // two mechanisms built under the same name.
     assertThrows(
         IllegalArgumentException.class,
         () -> new TuningState<>("Thing", UnitDoubleConverter.DEGREES));

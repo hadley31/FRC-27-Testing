@@ -5,42 +5,49 @@ import static org.wpilib.units.Units.Inches;
 import org.wpilib.units.measure.Distance;
 import org.wpilib.units.measure.LinearVelocity;
 
-import first.lib.mechanism.G3Mechanism;
+import first.lib.mechanism.ZeroableMechanism;
 import first.lib.util.UnitDoubleConverter;
 
-public interface PositionMechanism<T extends PositionMechanismIO>
-    extends G3Mechanism<T, PositionMechanismInputsAutoLogged, Distance> {
+/**
+ * A mechanism commanded to a position along a travel.
+ *
+ * <p>Zeroable, because a position names a place: these positions are in the zeroed frame, and the
+ * raw sensor readings behind them never leave {@link PositionMechanismIO}. See
+ * {@link ZeroableMechanism}.
+ */
+public abstract class PositionMechanism<T extends PositionMechanismIO>
+    extends ZeroableMechanism<T, PositionMechanismInputsAutoLogged, Distance> {
+  protected PositionMechanism(T io) {
+    super(io, new PositionMechanismInputsAutoLogged(), UnitDoubleConverter.INCHES);
+  }
+
   @Override
-  public default Distance getCurrentMeasurement() {
+  public Distance getCurrentMeasurement() {
     return getInputs().currentPosition;
   }
 
   @Override
-  public default Distance getTarget() {
+  public Distance getTarget() {
     return getInputs().targetPosition;
   }
 
-  public default LinearVelocity getCurrentVelocity() {
+  /** Unaffected by the zero offset: moving the frame does not change how fast it is travelling. */
+  public LinearVelocity getCurrentVelocity() {
     return getInputs().currentVelocity;
   }
 
   @Override
-  public default void setTarget(Distance position) {
+  public void setTarget(Distance position) {
     getIO().setTargetPosition(position);
   }
 
   @Override
-  default boolean isNear(Distance measure, Distance tolerance) {
+  public boolean isNear(Distance measure, Distance tolerance) {
     return getCurrentMeasurement().isNear(measure, tolerance);
   }
 
   @Override
-  default Distance getDefaultTolerance() {
+  public Distance getDefaultTolerance() {
     return Inches.of(0.25);
-  }
-
-  @Override
-  default UnitDoubleConverter<Distance> getMeasureType() {
-    return UnitDoubleConverter.INCHES;
   }
 }

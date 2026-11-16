@@ -95,6 +95,24 @@ public final class LoggedTunableMeasure<M extends Measure<?>> extends LoggedTuna
   }
 
   /**
+   * A tuned quantity the robot saves and restores at boot, published in a unit other than its
+   * default value's.
+   *
+   * <p>The pairing of the two {@code of} overloads' flexibility with {@code persistent}'s
+   * durability, for a caller that holds a converter rather than a measure and needs the value to
+   * outlive the session -- which is the situation anything generic over a measure is in. A zero
+   * offset is the example: see {@code ZeroableMechanism}.
+   *
+   * @param path absolute NT path; the unit name is appended
+   * @param converter the unit to store and display in
+   * @param codeDefault the value committed in code, in any unit of the same dimension
+   */
+  public static <M extends Measure<?>> LoggedTunableMeasure<M> persistent(
+      String path, UnitDoubleConverter<M> converter, M codeDefault) {
+    return new LoggedTunableMeasure<>(path, codeDefault, converter, true, true);
+  }
+
+  /**
    * A tuned quantity belonging to a larger tunable, whose owner calls {@code periodic()}.
    *
    * @param path absolute NT path; the unit name is appended

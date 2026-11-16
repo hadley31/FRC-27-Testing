@@ -69,7 +69,7 @@ public final class LoggedTunables {
    * Adds a newly constructed value to the registry.
    *
    * <p>Throws on a duplicate path rather than warning, which is stricter than
-   * {@link TuningStateCache}. Two values sharing a path would share one topic and write the same log
+   * a mechanism's own name. Two values sharing a path would share one topic and write the same log
    * key, and the second one's code default would be a phantom that the alert compares against
    * forever.
    *
@@ -193,8 +193,6 @@ public final class LoggedTunables {
    * tests claims the same paths ten times, and {@link #register} throws on the second. On a real
    * robot everything is constructed exactly once, which is why a duplicate there is a bug rather
    * than a situation to recover from.
-   *
-   * <p>Pair it with {@link TuningStateCache#clear()}, which caches objects that hold these paths.
    */
   public static void reset() {
     s_registry.clear();

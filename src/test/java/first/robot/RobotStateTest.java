@@ -22,7 +22,6 @@ import org.wpilib.math.kinematics.ChassisVelocities;
 
 import first.lib.mechanism.Gains;
 import first.lib.tuning.LoggedTunables;
-import first.lib.tuning.TuningStateCache;
 import first.lib.mechanism.angle.AngleMechanismIO;
 import first.lib.mechanism.angle.AngleMechanismInputsAutoLogged;
 import first.lib.mechanism.angularvelocity.AngularVelocityMechanismIO;
@@ -100,6 +99,15 @@ class RobotStateTest {
     }
 
     @Override
+    public org.wpilib.units.measure.Angle zero() {
+      return org.wpilib.units.Units.Degrees.of(0);
+    }
+
+    @Override
+    public void setZeroOffset(org.wpilib.units.measure.Angle offset) {
+    }
+
+    @Override
     public void setGains(Gains gains) {
     }
 
@@ -162,7 +170,6 @@ class RobotStateTest {
     // Every test builds a fresh Turret, Hood and Flywheel, and each one claims preference keys named
     // after itself. Without this the second test to run would throw on a duplicate key -- which is
     // the point of that check, since on a real robot a mechanism is constructed exactly once.
-    TuningStateCache.clear();
     LoggedTunables.reset();
   }
 

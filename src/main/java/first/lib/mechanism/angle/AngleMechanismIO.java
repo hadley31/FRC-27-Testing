@@ -7,9 +7,17 @@ import org.littletonrobotics.junction.AutoLog;
 import org.wpilib.units.measure.Angle;
 import org.wpilib.units.measure.AngularVelocity;
 
-import first.lib.mechanism.G3MechanismIO;
+import first.lib.mechanism.ZeroableMechanismIO;
 
-public interface AngleMechanismIO extends G3MechanismIO<AngleMechanismInputsAutoLogged> {
+/**
+ * Reads and commands a mechanism's angle, in the zeroed frame.
+ *
+ * <p>{@link ZeroableMechanismIO} is where the raw sensor reading lives: {@code currentAngle} and
+ * {@code targetAngle} below are both already offset, so nothing above an implementation of this has
+ * a raw encoder value to get wrong.
+ */
+public interface AngleMechanismIO
+    extends ZeroableMechanismIO<AngleMechanismInputsAutoLogged, Angle> {
   /**
    * Everything an {@link AngleMechanismIO} reports each loop. {@code @AutoLog} generates
    * {@link AngleMechanismInputsAutoLogged}, which adds the serialization the logger needs.

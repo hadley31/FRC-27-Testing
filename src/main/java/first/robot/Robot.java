@@ -48,7 +48,6 @@ import first.robot.mechanism.vision.apriltag.AprilTagVision;
 import first.robot.mechanism.vision.apriltag.AprilTagVisionFactory;
 import first.robot.mechanism.vision.apriltag.RobotHeadingSource;
 import first.robot.mechanism.vision.apriltag.photonvision.AprilTagVisionFactoryPhotonVision;
-import first.robot.mechanism.vision.apriltag.photonvision.AprilTagVisionFactoryPhotonVisionSim;
 import first.robot.mode.CompetitionAutoMode;
 import first.robot.mode.CompetitionTeleopMode;
 import first.robot.util.Constants;
@@ -143,9 +142,9 @@ public class Robot extends LoggedOpModeRobot {
       RobotHeadingSource headingSource,
       Supplier<Pose2d> groundTruthPoseSupplier) {
     return switch (Constants.RobotModeConstants.CURRENT_MODE) {
-      case REAL -> new AprilTagVisionFactoryPhotonVision(field, headingSource);
+      case REAL -> AprilTagVisionFactoryPhotonVision.real(field, headingSource);
 
-      case SIM -> new AprilTagVisionFactoryPhotonVisionSim(
+      case SIM -> AprilTagVisionFactoryPhotonVision.simulated(
           field, headingSource, groundTruthPoseSupplier);
 
       // Replay reads nothing, since the log supplies the inputs, and must not construct a real
